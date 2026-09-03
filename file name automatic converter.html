@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -445,6 +446,14 @@
     cursor:pointer;
   }
   .export-client-btn:hover{border-color:var(--lavender);color:var(--lavender-deep);}
+  .export-client-btn.up{
+    display:inline-block;
+    line-height:normal;
+    border-color:var(--lavender);
+    color:var(--lavender-deep);
+    cursor:pointer;
+  }
+  .export-client-btn.up:hover{background:var(--lavender-deep);color:#fff;border-color:var(--lavender-deep);}
 
   /* 구글시트 연결 */
   .sheet-box{
@@ -453,11 +462,32 @@
     border-top:1px solid var(--line);
   }
   .sheet-head{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:none;
+    border:none;
+    padding:2px 0;
+    margin:0;
+    cursor:pointer;
+    font-family:inherit;
     font-size:12.5px;
     font-weight:500;
     color:var(--ink);
-    margin-bottom:8px;
+    text-align:left;
   }
+  .sheet-head > span:first-child{display:flex;align-items:center;gap:6px;}
+  .sheet-head > span:first-child::before{
+    content:"▸";
+    color:var(--lavender-deep);
+    font-size:11px;
+    transition:transform .15s ease;
+  }
+  .sheet-box.open .sheet-head > span:first-child::before{transform:rotate(90deg);}
+  .sheet-hint-mini{font-size:11.5px;color:var(--lavender-deep);flex:none;font-weight:400;}
+  .sheet-body{margin-top:10px;}
   .sheet-row{display:flex;gap:8px;flex-wrap:wrap;}
   #sheetUrl{
     flex:1;
@@ -645,6 +675,15 @@
     flex-wrap:wrap;
   }
   .bulk-bar .note{font-size:12.5px;color:var(--ink-soft);}
+  .undo-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .undo-note{
+    font-size:12px;
+    color:var(--mint-deep);
+    max-width:230px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
   .zip-opt{
     display:flex;
     align-items:center;
@@ -1012,6 +1051,15 @@
     font-weight:500;
   }
   .learn-chip:hover{background:var(--mint-deep);border-color:var(--mint-deep);color:#fff;}
+  .more-ocr{
+    border-color:var(--lavender-deep);
+    background:var(--lavender-wash);
+    color:var(--lavender-deep);
+    font-weight:500;
+  }
+  .more-ocr:hover{background:var(--lavender-deep);color:#fff;}
+  .more-ocr:disabled{opacity:.55;cursor:not-allowed;}
+  .ev-hint{font-size:11px;color:var(--ink-soft);align-self:center;}
   .evidence details{margin-top:6px;}
   .evidence summary{cursor:pointer;color:var(--lavender-deep);font-weight:400;}
 
@@ -1054,15 +1102,21 @@
       <span class="client-count" id="clientCount">0개 저장됨</span>
     </button>
     <div class="client-panel-body" id="clientPanelBody" style="display:none;">
-      <p class="client-desc">한 줄에 하나씩 거래처명을 적어두면 문서에서 그 이름을 먼저 찾아요. <b>거래처명 뒤에 사업자등록번호를 같이 적으면</b> 상호 표기가 다르거나 스캔이 흐려도 번호만 맞으면 거래처가 확정됩니다. 이 브라우저에만 저장되고 다음에 다시 열어도 유지돼요.</p>
-      <textarea id="clientListInput" rows="4" placeholder="예)&#10;대한상사, 123-45-67890&#10;미래물산, 210-81-12345&#10;홍길동"></textarea>
+      <p class="client-desc">한 줄에 <b>거래처명, 사업자등록번호, 대표자</b> 순서로 적어주세요. 사업자등록번호가 있으면 상호 표기가 다르거나 스캔이 흐려도 번호만 맞으면 거래처가 확정되고, <b>대표자를 적어두면</b> 개인사업자 계약서처럼 상호 없이 대표자 이름만 적힌 문서도 거래처명으로 바꿔 넣어요. 뒤 두 칸은 없으면 비워두셔도 됩니다.</p>
+      <textarea id="clientListInput" rows="4" placeholder="예)&#10;대한상사, 123-45-67890, 김대표&#10;미래물산, 210-81-12345, 박영희&#10;성실상회, , 홍길동&#10;개인고객 홍길동"></textarea>
       <div class="client-btn-row">
         <button class="save-client-btn" id="saveClientListBtn">목록 저장</button>
         <button class="export-client-btn" id="exportClientBtn">목록 내려받기 (CSV)</button>
+        <label class="export-client-btn up" for="clientUploadInput">목록 올리기 (CSV·엑셀)</label>
+        <input type="file" id="clientUploadInput" accept=".csv,.tsv,.txt,.xlsx,.xls" style="display:none;">
       </div>
 
       <div class="sheet-box">
-        <div class="sheet-head">구글시트에서 가져오기</div>
+        <button class="sheet-head" id="sheetToggle" type="button">
+          <span>구글시트에서 가져오기</span>
+          <span class="sheet-hint-mini" id="sheetToggleHint">펼치기</span>
+        </button>
+        <div class="sheet-body" id="sheetBody" style="display:none;">
         <p class="sheet-lead">시트 공유 설정을 바꾸지 않고 가져오는 방법이에요. 둘 중 편한 쪽을 쓰시면 됩니다.</p>
 
         <div id="clientDrop" class="client-drop">
@@ -1090,6 +1144,7 @@
         </details>
 
         <p class="sheet-note"><b>표 형태</b> · 첫 줄에 <b>거래처명</b>(또는 상호·업체·회사·고객사·관여처) 머리글이 있으면 그 열을 읽고, 머리글이 없으면 첫 번째 열을 읽어요. 상호에 붙은 '주식회사'는 파일명에서 자동으로 빠집니다.</p>
+      </div>
       </div>
 
       <div class="opt-row">
@@ -1145,7 +1200,10 @@
 
     <div class="bulk-bar" id="bulkBar" style="display:none;">
       <label class="zip-opt"><input type="checkbox" id="optZipGroup" checked> ZIP 안에서 거래처별 폴더로 묶기</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <span class="undo-note" id="undoNote"></span>
+        <button class="clear-btn undo-btn" id="undoBtn" disabled>↩ 되돌리기</button>
+        <button class="clear-btn undo-btn" id="redoBtn" disabled>↪ 다시 실행</button>
         <button class="clear-btn" id="logBtn">처리 이력 (CSV)</button>
         <button class="clear-btn" id="clearAllBtn">전체 지우기</button>
         <button class="zip-btn" id="zipBtn">전체 압축 다운로드 (ZIP)</button>
@@ -1383,7 +1441,22 @@ function preprocessForOCR(canvas) {
    형식별 추출기 → { lines, method, meta }
 --------------------------------------------------------- */
 const MAX_TEXT_PAGES = 5;
-const MAX_OCR_PAGES = 4;   // 스캔본에서 추가로 읽어볼 최대 쪽수
+const MAX_OCR_PAGES = 6;   // 스캔본에서 처음에 읽어볼 최대 쪽수
+const OCR_MORE_STEP = 6;   // '더 읽기'를 누를 때마다 추가로 읽는 쪽수
+
+/* 계약서는 당사자 이름이 맨 뒤 서명란에 있는 경우가 많다.
+   그래서 앞에서부터 순서대로가 아니라 앞·뒤를 번갈아 읽는다. (1, 마지막, 2, 마지막-1 ...) */
+function ocrPageOrder(total, max) {
+  const order = [];
+  let lo = 1, hi = total;
+  const want = Math.min(max, total);
+  while (order.length < want) {
+    if (lo <= hi) order.push(lo++);
+    if (order.length >= want) break;
+    if (hi >= lo) order.push(hi--);
+  }
+  return order;
+}
 
 function parsePdfDate(v) {
   const m = /D:(\d{4})(\d{2})(\d{2})/.exec(v || "");
@@ -1667,20 +1740,67 @@ function detectBizNos(text) {
 
 // 목록 한 줄을 {이름, 사업자번호}로 분해. "미래물산, 210-81-12345" / "210-81-12345 미래물산" 모두 인식
 function parseClientLine(line) {
-  const s = String(line || "").trim();
-  if (!s) return null;
-  BIZNO_RE.lastIndex = 0;
-  const m = BIZNO_RE.exec(s);
-  let bizNo = "", name = s;
-  if (m) {
-    const hit = m[1] + m[2] + m[3];
-    bizNo = hit;
-    const start = m.index + m[0].length - m[0].replace(/^[^0-9]/, "").length;
-    name = (s.slice(0, start) + " " + s.slice(m.index + m[0].length)).trim();
+  const raw = String(line || "").trim();
+  if (!raw) return null;
+  const parts = raw.split(/[,\t]/).map(function (x) { return x.trim(); })
+    .filter(function (x) { return x !== ""; });
+
+  let bizNo = "";
+  const rest = [];
+  parts.forEach(function (x) {
+    const d = normalizeBizNo(x);
+    if (!bizNo && d.length === 10 && /^[\d\s.\-]+$/.test(x)) bizNo = d;
+    else rest.push(x);
+  });
+
+  // 쉼표 없이 한 줄로 적은 경우엔 문장 속에서 번호를 찾아냄
+  if (!bizNo && parts.length === 1) {
+    BIZNO_RE.lastIndex = 0;
+    const m = BIZNO_RE.exec(raw);
+    if (m) {
+      bizNo = m[1] + m[2] + m[3];
+      const cut = (raw.slice(0, m.index) + " " + raw.slice(m.index + m[0].length))
+        .replace(/\s{2,}/g, " ").trim();
+      rest.length = 0;
+      if (cut) rest.push(cut);
+    }
   }
-  name = name.replace(/[,\t]/g, " ").replace(/\s{2,}/g, " ").trim();
+
+  const name = (rest[0] || "").replace(/\s{2,}/g, " ").trim();
+  const owner = (rest[1] || "").replace(/\s{2,}/g, " ").trim();
   if (!name) return null;
-  return { name: name, bizNo: bizNo };
+  return { name: name, bizNo: bizNo, owner: owner };
+}
+
+function escapeRe(v) { return String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+// 이름이 낱말 그대로 떨어져 나오는 경우
+function textHasName(text, name) {
+  const n = String(name || "").trim();
+  if (n.length < 2) return false;
+  return new RegExp("(^|[^가-힣A-Za-z0-9])" + escapeRe(n) + "([^가-힣A-Za-z0-9]|$)").test(text);
+}
+
+// 계약서에서 이름 앞에 붙는 말들
+const PARTY_LABELS = [
+  "임차인", "임대인", "매수인", "매도인", "양수인", "양도인", "수급인", "도급인",
+  "사업주", "근로자", "계약자", "대표자", "대표", "성명", "이름", "귀하",
+  "채권자", "채무자", "보증인", "연대보증인", "신고인", "납세자", "위임인", "수임인", "의뢰인",
+];
+
+/* 대표자 이름이 문서에 나오는지 확인.
+   PDF를 표에서 뽑으면 '임차인홍길동'처럼 라벨과 붙어 나오거나 '홍 길 동'처럼
+   자간이 벌어지는 일이 잦아서, 띄어쓰기·기호를 걷어낸 문장으로도 함께 확인한다. */
+function findOwner(text, flatKo, name) {
+  const n = String(name || "").trim();
+  if (n.length < 2) return null;
+  const flatName = n.replace(/\s/g, "");
+  for (const lb of PARTY_LABELS) {
+    if (flatKo.indexOf(lb + flatName) !== -1) return { score: 116, tag: lb };
+  }
+  if (textHasName(text, n)) return { score: 112, tag: "" };
+  if (flatKo.indexOf(flatName) !== -1) return { score: 96, tag: "" };
+  return null;
 }
 
 // 값 뒤에 다른 항목 라벨이 붙어 오는 경우를 잘라내기 위한 목록
@@ -1853,6 +1973,26 @@ function detectClients(lines, fileBase, savedList) {
         fileBase.replace(/\s/g, "").indexOf(flatCore) !== -1)) {
         add(core, 118, "파일명이 저장된 거래처 목록과 일치");
       }
+    });
+  }
+
+  /* (1-2) 대표자명 대조
+     개인사업자는 계약서에 상호 없이 대표자 이름만 적히는 경우가 많다.
+     목록에 대표자를 적어두면 그 이름을 보고 거래처명으로 바꿔 넣는다. */
+  if (savedList && savedList.length) {
+    const flatKo = text.replace(/[\s:：·.,()\[\]{}<>\-_/\\|]/g, "");
+    const matched = [];
+    savedList.forEach(function (e) {
+      if (!e || !e.owner) return;
+      const hit = findOwner(text, flatKo, e.owner);
+      if (hit) matched.push({ e: e, hit: hit });
+    });
+    matched.forEach(function (m) {
+      const core = cleanClientName(m.e.name) || String(m.e.name).trim();
+      const dup = matched.filter(function (o) { return o.e.owner === m.e.owner; }).length > 1;
+      const where = m.hit.tag ? " (" + m.hit.tag + ")" : "";
+      add(core, dup ? Math.min(88, m.hit.score - 24) : m.hit.score,
+        "대표자 " + m.e.owner + where + " 로 찾음" + (dup ? " · 동명이인 있음, 확인 필요" : ""));
     });
   }
 
@@ -2622,6 +2762,11 @@ function cardHTML(item) {
         '<span class="ev-line">· 제목으로 판단한 줄 : ' + esc(item.titleLine || "(찾지 못함)") + "</span>" +
         '<span class="ev-line">· 추출 방식 : ' + esc(item.method || "-") + "</span>" +
         bizNoHTML(item) +
+        (item.ocr && item.ocr.read.length < item.ocr.total
+          ? '<div class="ev-learn"><button type="button" class="chip more-ocr" data-act="more-ocr">' +
+            '스캔 문서 이어서 더 읽기 (지금 ' + item.ocr.read.length + '/' + item.ocr.total + '쪽 읽음)</button>' +
+            '<span class="ev-hint">계약서 묶음처럼 쪽수가 많으면, 뒤쪽 서명란에 있는 이름을 여기서 찾을 수 있어요.</span></div>'
+          : "") +
         "<details><summary>문서에서 읽은 텍스트 보기</summary>" +
           '<textarea class="debug-text" readonly rows="6">' + esc((item.extractedText || "(추출된 텍스트가 없어요)").slice(0, 3000)) + "</textarea>" +
         "</details>" +
@@ -2632,7 +2777,17 @@ function cardHTML(item) {
 function bindCard(item) {
   const el = item.el;
   el.querySelectorAll("input[data-field]").forEach(function (inp) {
+    inp.addEventListener("focus", function () {
+      pendingEditSnap = makeSnapshot("직접 입력 · " + item.file.name);
+    });
     inp.addEventListener("input", function (e) {
+      if (pendingEditSnap) {
+        undoStack.push(pendingEditSnap);
+        if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+        redoStack.length = 0;
+        pendingEditSnap = null;
+        paintUndo();
+      }
       const f = e.target.dataset.field;
       item[f] = e.target.value;
       item.edited = item.edited || {};
@@ -2664,6 +2819,7 @@ function bindCard(item) {
   el.querySelectorAll(".chip[data-field]").forEach(function (btn) {
     btn.addEventListener("click", function (e) {
       const f = e.currentTarget.dataset.field;
+      pushUndo("후보 선택 · " + item.file.name);
       item[f] = e.currentTarget.dataset.val;
       item.edited = item.edited || {};
       item.edited[f] = true;
@@ -2671,7 +2827,11 @@ function bindCard(item) {
     });
   });
   const fmt = el.querySelector('[data-act="fmt"]');
-  if (fmt) fmt.addEventListener("change", function (e) { item.targetFormat = e.target.value; refreshCard(item); });
+  if (fmt) fmt.addEventListener("change", function (e) {
+    pushUndo("형식 변경 · " + item.file.name);
+    item.targetFormat = e.target.value;
+    refreshCard(item);
+  });
   const tg = el.querySelector('[data-act="toggle"]');
   if (tg) tg.addEventListener("click", function () { item.expanded = !item.expanded; refreshCard(item); });
   const pick = el.querySelector('[data-act="pick"]');
@@ -2679,14 +2839,20 @@ function bindCard(item) {
     item.picked = e.target.checked;
     paintBulkEdit();
   });
+  const moreOcr = el.querySelector('[data-act="more-ocr"]');
+  if (moreOcr) moreOcr.addEventListener("click", function (e) {
+    e.currentTarget.disabled = true;
+    e.currentTarget.textContent = "읽는 중...";
+    ocrMorePages(item);
+  });
   const pvBtn = el.querySelector('[data-act="preview"]');
   if (pvBtn) pvBtn.addEventListener("click", function () { openPreview(item); });
   const rm = el.querySelector('[data-act="remove"]');
   if (rm) rm.addEventListener("click", function () {
+    pushUndo("파일 삭제 · " + item.file.name);
     const i = state.indexOf(item);
     if (i !== -1) state.splice(i, 1);
     if (pv.item === item) closePreview();
-    releaseItem(item);
     if (item.el && item.el.parentNode) item.el.parentNode.removeChild(item.el);
     updateChrome();
   });
@@ -2737,6 +2903,103 @@ function updateChrome() {
   paintBulkEdit();
 }
 
+/* =========================================================
+   되돌리기 / 다시 실행
+   - 값을 바꾸기 "직전"의 상태를 통째로 찍어두고, 필요하면 그 시점으로 되돌림
+========================================================= */
+const UNDO_LIMIT = 40;
+const undoStack = [];
+let pendingEditSnap = null;
+const redoStack = [];
+const undoBtn = document.getElementById("undoBtn");
+const redoBtn = document.getElementById("redoBtn");
+const undoNote = document.getElementById("undoNote");
+let noteTimer = null;
+
+function makeSnapshot(label) {
+  return {
+    label: label,
+    order: state.slice(),
+    vals: state.map(function (it) {
+      return {
+        it: it,
+        docType: it.docType, client: it.client, date: it.date,
+        targetFormat: it.targetFormat, picked: !!it.picked, expanded: !!it.expanded,
+        edited: Object.assign({}, it.edited || {}),
+      };
+    }),
+  };
+}
+
+function applySnapshot(sn) {
+  sn.vals.forEach(function (v) {
+    v.it.docType = v.docType;
+    v.it.client = v.client;
+    v.it.date = v.date;
+    v.it.targetFormat = v.targetFormat;
+    v.it.picked = v.picked;
+    v.it.expanded = v.expanded;
+    v.it.edited = Object.assign({}, v.edited);
+  });
+  state.length = 0;
+  sn.order.forEach(function (it) { state.push(it); });
+  fileListEl.innerHTML = "";
+  state.forEach(function (it) { it.el = null; mountCard(it); });
+  updateChrome();
+}
+
+function paintUndo() {
+  undoBtn.disabled = undoStack.length === 0;
+  redoBtn.disabled = redoStack.length === 0;
+  undoBtn.title = undoStack.length ? "되돌리기 : " + undoStack[undoStack.length - 1].label + "  (Ctrl+Z)" : "되돌릴 작업이 없어요";
+  redoBtn.title = redoStack.length ? "다시 실행 : " + redoStack[redoStack.length - 1].label + "  (Ctrl+Y)" : "다시 실행할 작업이 없어요";
+}
+
+function showUndoNote(msg) {
+  undoNote.textContent = msg;
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = setTimeout(function () { undoNote.textContent = ""; }, 4000);
+}
+
+// 값을 바꾸기 "직전"에 부른다
+function pushUndo(label) {
+  undoStack.push(makeSnapshot(label));
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+  paintUndo();
+}
+
+function doUndo() {
+  if (!undoStack.length) return;
+  const sn = undoStack.pop();
+  redoStack.push(makeSnapshot(sn.label));
+  applySnapshot(sn);
+  showUndoNote("되돌렸어요 · " + sn.label);
+  paintUndo();
+}
+
+function doRedo() {
+  if (!redoStack.length) return;
+  const sn = redoStack.pop();
+  undoStack.push(makeSnapshot(sn.label));
+  applySnapshot(sn);
+  showUndoNote("다시 실행했어요 · " + sn.label);
+  paintUndo();
+}
+
+undoBtn.addEventListener("click", doUndo);
+redoBtn.addEventListener("click", doRedo);
+
+document.addEventListener("keydown", function (e) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const t = e.target;
+  // 입력칸 안에서는 브라우저 기본 되돌리기를 그대로 둠
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" && !e.shiftKey) { e.preventDefault(); doUndo(); }
+  else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); doRedo(); }
+});
+
 /* ---- 여러 파일 한 번에 지정 ---- */
 const beAll = document.getElementById("beAll");
 const beCount = document.getElementById("beCount");
@@ -2773,6 +3036,7 @@ beApply.addEventListener("click", function () {
     date: document.getElementById("beDate").value.trim(),
   };
   if (!vals.client && !vals.docType && !vals.date) return;
+  pushUndo("거래처·문서종류 일괄 지정 (" + targets.length + "개)");
   targets.forEach(function (item) {
     ["client", "docType", "date"].forEach(function (f) {
       if (!vals[f]) return;            // 비워둔 칸은 건드리지 않음
@@ -2824,6 +3088,57 @@ function currentOpts() {
     useFileDate: document.getElementById("optUseFileDate").checked,
     forceOcr: document.getElementById("optForceOcr").checked,
   };
+}
+
+/* 스캔 문서를 이어서 더 읽기 (계약서 묶음처럼 쪽수가 많은 자료용) */
+async function ocrMorePages(item) {
+  const o = item.ocr;
+  if (!o || o.read.length >= o.total) return;
+  const rest = ocrPageOrder(o.total, o.total).filter(function (n) {
+    return o.read.indexOf(n) === -1;
+  }).slice(0, OCR_MORE_STEP);
+  if (!rest.length) return;
+
+  item.status = "busy";
+  job.running = true;
+  job.total = Math.max(job.total, 1);
+  job.cancel = false;
+  pgCancel.disabled = false;
+  ocrProgress = function (p, label) {
+    job.sub = Math.max(0, Math.min(0.95, p || 0));
+    job.subText = label + " " + Math.round((p || 0) * 100) + "%";
+    item.statusMsg = job.subText;
+    paintProgress();
+  };
+
+  for (const pno of rest) {
+    if (job.cancel) break;
+    item.statusMsg = "스캔 " + pno + "쪽 읽는 중 (전체 " + o.total + "쪽)";
+    job.name = item.file.name;
+    job.subText = item.statusMsg;
+    paintProgress();
+    refreshCard(item);
+    try {
+      const extra = await ocrPdfPage(o.pdf, pno, 3);
+      o.doc.lines = (o.doc.lines || []).concat(extra);
+      o.read.push(pno);
+      item.method = "OCR 인식 (" + o.read.length + "/" + o.total + "쪽 읽음)";
+      analyzeDoc(item, o.doc, o.opts);
+    } catch (e) {
+      console.warn("추가 OCR 실패", e);
+      break;
+    }
+  }
+  ocrProgress = null;
+  item.status = "done";
+  item.statusMsg = "";
+  job.running = false;
+  job.total = 0;
+  job.done = 0;
+  job.sub = 0;
+  job.subText = "";
+  paintProgress();
+  refreshCard(item);
 }
 
 /* ---- 진행률 표시 / 중단 ---- */
@@ -2906,17 +3221,21 @@ async function addFiles(fileArray) {
     /* 스캔본은 첫 장만 읽으면 서명란·마지막 장에 있는 상호·날짜를 놓친다.
        아직 확실하지 않은 항목이 있을 때만 다음 장을 추가로 읽는다 (최대 4쪽까지). */
     if (ext === "pdf" && doc.method === "OCR 인식" && doc.pdfDoc && doc.pdfDoc.numPages > 1) {
-      const lastPage = Math.min(MAX_OCR_PAGES, doc.pdfDoc.numPages);
-      for (let p = 2; p <= lastPage; p++) {
+      // 나중에 '더 읽기'로 이어서 읽을 수 있도록 상태를 남겨둔다
+      item.ocr = { pdf: doc.pdfDoc, total: doc.pdfDoc.numPages, read: [1], doc: doc, opts: opts };
+      const order = ocrPageOrder(doc.pdfDoc.numPages, MAX_OCR_PAGES)
+        .filter(function (n) { return n !== 1; });
+      for (const pno of order) {
         if (job.cancel || weakCount() === 0) break;
-        item.statusMsg = "스캔 " + p + "쪽 추가 인식 중";
+        item.statusMsg = "스캔 " + pno + "쪽 추가 인식 중 (전체 " + doc.pdfDoc.numPages + "쪽)";
         job.subText = item.statusMsg;
         paintProgress();
         refreshCard(item);
         try {
-          const extra = await ocrPdfPage(doc.pdfDoc, p, 3);
+          const extra = await ocrPdfPage(doc.pdfDoc, pno, 3);
           doc.lines = (doc.lines || []).concat(extra);
-          item.method = "OCR 인식 (" + p + "쪽까지)";
+          item.ocr.read.push(pno);
+          item.method = "OCR 인식 (" + item.ocr.read.length + "/" + doc.pdfDoc.numPages + "쪽 읽음)";
           analyzeDoc(item, doc, opts);
         } catch (e) {
           console.warn("추가 페이지 OCR 실패", e);
@@ -2991,22 +3310,31 @@ function loadClientList() {
   if (!Array.isArray(saved)) saved = [];
   clientList = saved.map(function (e) {
     if (typeof e === "string") return { name: e.trim(), bizNo: "" };
-    return { name: String((e && e.name) || "").trim(), bizNo: normalizeBizNo(e && e.bizNo) };
+    return {
+      name: String((e && e.name) || "").trim(),
+      bizNo: normalizeBizNo(e && e.bizNo),
+      owner: String((e && e.owner) || "").trim(),
+    };
   }).filter(function (e) { return e.name; });
   paintClientList();
 }
 
 function clientListText() {
   return clientList.map(function (e) {
-    return e.bizNo ? e.name + ", " + formatBizNo(e.bizNo) : e.name;
+    const cols = [e.name];
+    if (e.bizNo) cols.push(formatBizNo(e.bizNo));
+    if (e.owner) cols.push(e.owner);
+    return cols.join(", ");
   }).join("\n");
 }
 
 function paintClientList() {
   clientListInput.value = clientListText();
   const withBiz = clientList.filter(function (e) { return e.bizNo; }).length;
+  const withOwner = clientList.filter(function (e) { return e.owner; }).length;
   clientCountEl.textContent = clientList.length + "개 저장됨" +
-    (withBiz ? " · 사업자번호 " + withBiz + "개" : "");
+    (withBiz ? " · 사업자번호 " + withBiz : "") +
+    (withOwner ? " · 대표자 " + withOwner : "");
 }
 
 function saveClientEntries(entries) {
@@ -3016,13 +3344,15 @@ function saveClientEntries(entries) {
     if (!e || !e.name) return;
     const name = String(e.name).trim();
     const bizNo = normalizeBizNo(e.bizNo);
+    const owner = String(e.owner || "").trim();
     if (!name) return;
     if (idx[name] !== undefined) {
       if (bizNo && !clientList[idx[name]].bizNo) clientList[idx[name]].bizNo = bizNo;
+      if (owner && !clientList[idx[name]].owner) clientList[idx[name]].owner = owner;
       return;
     }
     idx[name] = clientList.length;
-    clientList.push({ name: name, bizNo: bizNo });
+    clientList.push({ name: name, bizNo: bizNo, owner: owner });
   });
   paintClientList();
   try { localStorage.setItem(CLIENT_LIST_KEY, JSON.stringify(clientList)); } catch (e) {}
@@ -3042,20 +3372,25 @@ function csvCell(v) {
   const s = String(v == null ? "" : v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
+document.getElementById("clientUploadInput").addEventListener("change", function (e) {
+  if (e.target.files && e.target.files[0]) loadClientFile(e.target.files[0]);
+  e.target.value = "";
+});
+
 document.getElementById("exportClientBtn").addEventListener("click", function () {
-  if (!clientList.length) {
-    setSheetStatus("내려받을 거래처가 없어요. 목록을 먼저 채워주세요.", "err");
-    return;
-  }
-  const rows = [["거래처명", "사업자등록번호"]].concat(clientList.map(function (e) {
-    return [e.name, e.bizNo ? formatBizNo(e.bizNo) : ""];
+  // 목록이 비어 있으면 채워 넣을 수 있는 빈 양식을 내려준다
+  const emptyList = clientList.length === 0;
+  const rows = [["거래처명", "사업자등록번호", "대표자"]].concat(clientList.map(function (e) {
+    return [e.name, e.bizNo ? formatBizNo(e.bizNo) : "", e.owner || ""];
   }));
   const csv = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
   const d = new Date();
   const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
   triggerDownload(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }),
-    "거래처목록_" + stamp + ".csv");
-  setSheetStatus(clientList.length + "개를 CSV로 내려받았어요. 다른 PC에서는 이 파일을 위에 끌어다 놓으면 그대로 옮겨집니다.", "ok");
+    (emptyList ? "거래처목록_양식_" : "거래처목록_") + stamp + ".csv");
+  setSheetStatus(emptyList
+    ? "빈 양식을 내려받았어요. 엑셀에서 거래처명·사업자등록번호·대표자를 채운 뒤 '목록 올리기'로 넣어주세요."
+    : clientList.length + "개를 CSV로 내려받았어요. 채워 넣거나 고친 뒤 '목록 올리기'로 다시 넣으면 됩니다.", "ok");
 });
 
 loadClientList();
@@ -3073,9 +3408,42 @@ const sheetStatusEl = document.getElementById("sheetStatus");
 const sheetAutoEl = document.getElementById("sheetAuto");
 const sheetSyncBtn = document.getElementById("sheetSyncBtn");
 
+const SHEET_OPEN_KEY = "taxRenamer_sheetOpen";
+const sheetToggle = document.getElementById("sheetToggle");
+const sheetBody = document.getElementById("sheetBody");
+const sheetToggleHint = document.getElementById("sheetToggleHint");
+
+function setSheetOpen(open, remember) {
+  sheetBody.style.display = open ? "block" : "none";
+  sheetToggle.closest(".sheet-box").classList.toggle("open", open);
+  sheetToggleHint.textContent = open ? "접기" : "펼치기";
+  if (remember) {
+    try { localStorage.setItem(SHEET_OPEN_KEY, open ? "1" : "0"); } catch (e) {}
+  }
+}
+
+sheetToggle.addEventListener("click", function () {
+  setSheetOpen(sheetBody.style.display === "none", true);
+});
+
+(function initSheetOpen() {
+  let open = false;
+  try { open = localStorage.getItem(SHEET_OPEN_KEY) === "1"; } catch (e) {}
+  setSheetOpen(open, false);
+})();
+
+/* 목록을 올리거나 내려받으면 안내가 이 안에 뜨기 때문에,
+   접혀 있으면 자동으로 펼쳐서 결과가 묻히지 않게 한다. */
 function setSheetStatus(msg, kind) {
   sheetStatusEl.textContent = msg;
   sheetStatusEl.className = "sheet-status" + (kind ? " " + kind : "");
+  if (msg) {
+    setSheetOpen(true, false);
+    const panel = document.getElementById("clientPanelBody");
+    if (panel && panel.style.display === "none") {
+      document.getElementById("clientPanelToggle").click();
+    }
+  }
 }
 
 // 붙여넣은 주소에서 CSV로 읽을 수 있는 후보 주소들을 만들어냄
@@ -3206,17 +3574,30 @@ function namesFrom(rows, headerRow, col) {
 }
 
 // 이름 열 + 사업자번호 열을 함께 읽어 목록 항목으로 만듦
-function entriesFrom(rows, headerRow, nameCol, bizCol) {
+function entriesFrom(rows, headerRow, nameCol, bizCol, ownerCol) {
   const out = [], seen = {};
   for (let i = Math.max(0, headerRow + 1); i < rows.length; i++) {
     const v = rows[i][nameCol];
     if (!looksLikeName(v) || seen[v]) continue;
     seen[v] = true;
-    const raw = bizCol >= 0 ? rows[i][bizCol] : "";
-    const d = normalizeBizNo(raw);
-    out.push({ name: v, bizNo: d.length === 10 ? d : "" });
+    const d = normalizeBizNo(bizCol >= 0 ? rows[i][bizCol] : "");
+    const ow = ownerCol >= 0 ? String(rows[i][ownerCol] || "").trim() : "";
+    out.push({ name: v, bizNo: d.length === 10 ? d : "", owner: ow });
   }
   return out;
+}
+
+// 대표자 열은 머리글로만 찾는다 (사람 이름은 생김새로 구분하기 어려움)
+const OWNER_HEADER_RE = /(대표자|대표|사업주|성명|이름|owner|ceo)/i;
+function guessOwnerCol(rows, headerRow, nameCol, bizCol) {
+  if (headerRow < 0) return -1;
+  const nCols = rows.length ? rows[0].length : 0;
+  for (let c = 0; c < nCols; c++) {
+    if (c === nameCol || c === bizCol) continue;
+    const h = rows[headerRow][c];
+    if (h && h.length <= 10 && OWNER_HEADER_RE.test(h)) return c;
+  }
+  return -1;
 }
 
 // 사업자번호가 들어있는 열 추측 : 머리글로 먼저, 없으면 값의 생김새로
@@ -3254,15 +3635,18 @@ function pickNamesFromRows(rowsRaw) {
   if (!rows.length) return { names: [], entries: [], colInfo: "", rows: rows, headerRow: -1, col: 0, bizCol: -1 };
   const g = guessLayout(rows);
   const bizCol = guessBizCol(rows, g.headerRow, g.col);
+  const ownerCol = guessOwnerCol(rows, g.headerRow, g.col, bizCol);
   return {
     names: namesFrom(rows, g.headerRow, g.col),
-    entries: entriesFrom(rows, g.headerRow, g.col, bizCol),
+    entries: entriesFrom(rows, g.headerRow, g.col, bizCol, ownerCol),
     colInfo: colLabel(rows, g.headerRow, g.col) +
-      (bizCol >= 0 ? " + 사업자번호 " + colLabel(rows, g.headerRow, bizCol) : ""),
+      (bizCol >= 0 ? " + 사업자번호 " + colLabel(rows, g.headerRow, bizCol) : "") +
+      (ownerCol >= 0 ? " + 대표자 " + colLabel(rows, g.headerRow, ownerCol) : ""),
     rows: rows,
     headerRow: g.headerRow,
     col: g.col,
     bizCol: bizCol,
+    ownerCol: ownerCol,
   };
 }
 
@@ -3310,11 +3694,12 @@ function hideColPicker() {
   pickerRows = null;
 }
 
-function renderColPicker(rows, headerRow, col, sourceLabel, bizCol) {
+function renderColPicker(rows, headerRow, col, sourceLabel, bizCol, ownerCol) {
   pickerRows = rows;
   if (!rows.length) { hideColPicker(); return; }
   const nCols = rows[0].length;
   if (bizCol === undefined) bizCol = guessBizCol(rows, headerRow, col);
+  if (ownerCol === undefined) ownerCol = guessOwnerCol(rows, headerRow, col, bizCol);
 
   const headOpts = ['<option value="-1"' + (headerRow === -1 ? " selected" : "") + ">머리글 없음 (첫 줄부터 거래처명)</option>"];
   for (let i = 0; i < Math.min(10, rows.length); i++) {
@@ -3345,10 +3730,23 @@ function renderColPicker(rows, headerRow, col, sourceLabel, bizCol) {
       colLetter(c) + (hv ? " · " + esc(hv) : "") + (sample ? "  (예: " + esc(sample) + ")" : "") + "</option>");
   }
 
-  const entries = entriesFrom(rows, headerRow, col, bizCol);
+  const ownerOpts = ['<option value="-1"' + (ownerCol === -1 ? " selected" : "") + ">사용 안 함</option>"];
+  for (let c = 0; c < nCols; c++) {
+    const hv = headerRow >= 0 ? rows[headerRow][c] : "";
+    let sample = "";
+    for (let r = Math.max(0, headerRow + 1); r < rows.length; r++) {
+      if (rows[r][c]) { sample = rows[r][c].slice(0, 14); break; }
+    }
+    ownerOpts.push('<option value="' + c + '"' + (ownerCol === c ? " selected" : "") + ">" +
+      colLetter(c) + (hv ? " · " + esc(hv) : "") + (sample ? "  (예: " + esc(sample) + ")" : "") + "</option>");
+  }
+
+  const entries = entriesFrom(rows, headerRow, col, bizCol, ownerCol);
   const bizCount = entries.filter(function (e) { return e.bizNo; }).length;
+  const ownerCount = entries.filter(function (e) { return e.owner; }).length;
   const preview = entries.length
-    ? "<b>" + entries.length + "개</b>" + (bizCount ? " (사업자번호 " + bizCount + "개 포함)" : "") + " · " +
+    ? "<b>" + entries.length + "개</b>" +
+      (bizCount ? " · 사업자번호 " + bizCount : "") + (ownerCount ? " · 대표자 " + ownerCount : "") + " · " +
       esc(entries.slice(0, 6).map(function (e) { return e.name; }).join(", ")) + (entries.length > 6 ? " …" : "")
     : "<b>0개</b> · 이 열에는 상호로 볼 만한 값이 없어요. 다른 열을 골라보세요.";
 
@@ -3358,6 +3756,7 @@ function renderColPicker(rows, headerRow, col, sourceLabel, bizCol) {
       '<div class="cp-field"><label>머리글 줄</label><select id="cpHeader">' + headOpts.join("") + "</select></div>" +
       '<div class="cp-field"><label>거래처명이 있는 열</label><select id="cpCol">' + colOpts.join("") + "</select></div>" +
       '<div class="cp-field"><label>사업자등록번호 열 (있으면 정확도가 크게 올라가요)</label><select id="cpBiz">' + bizOpts.join("") + "</select></div>" +
+      '<div class="cp-field"><label>대표자 열 (개인사업자 계약서에 도움돼요)</label><select id="cpOwner">' + ownerOpts.join("") + "</select></div>" +
     "</div>" +
     '<div class="cp-preview">' + preview + "</div>" +
     '<div class="cp-actions">' +
@@ -3369,20 +3768,23 @@ function renderColPicker(rows, headerRow, col, sourceLabel, bizCol) {
   const hSel = document.getElementById("cpHeader");
   const cSel = document.getElementById("cpCol");
   const bSel = document.getElementById("cpBiz");
-  function onChange(keepBiz) {
-    const nextCol = parseInt(cSel.value, 10);
-    renderColPicker(rows, parseInt(hSel.value, 10), nextCol, sourceLabel,
-      keepBiz ? parseInt(bSel.value, 10) : undefined);
+  const oSel = document.getElementById("cpOwner");
+  function onChange(keepExtra) {
+    renderColPicker(rows, parseInt(hSel.value, 10), parseInt(cSel.value, 10), sourceLabel,
+      keepExtra ? parseInt(bSel.value, 10) : undefined,
+      keepExtra ? parseInt(oSel.value, 10) : undefined);
   }
   hSel.addEventListener("change", function () { onChange(false); });
   cSel.addEventListener("change", function () { onChange(false); });
   bSel.addEventListener("change", function () { onChange(true); });
+  oSel.addEventListener("change", function () { onChange(true); });
   document.getElementById("cpClose").addEventListener("click", hideColPicker);
   document.getElementById("cpApply").addEventListener("click", function () {
     saveClientEntries(entries);
     setSheetStatus(sourceLabel + "에서 " + entries.length + "개를 목록에 넣었어요 (" +
       colLabel(rows, headerRow, col) +
-      (bizCol >= 0 ? " + 사업자번호 " + colLabel(rows, headerRow, bizCol) : "") + " 기준).", "ok");
+      (bizCol >= 0 ? " + 사업자번호 " + colLabel(rows, headerRow, bizCol) : "") +
+      (ownerCol >= 0 ? " + 대표자 " + colLabel(rows, headerRow, ownerCol) : "") + " 기준).", "ok");
   });
 }
 
@@ -3409,7 +3811,7 @@ async function loadClientFile(file) {
     } else {
       setSheetStatus('"' + file.name + '"은 읽었는데 어느 열이 거래처명인지 판단하지 못했어요. 아래에서 직접 골라주세요.', "err");
     }
-    renderColPicker(picked.rows, picked.headerRow, picked.col, file.name, picked.bizCol);
+    renderColPicker(picked.rows, picked.headerRow, picked.col, file.name, picked.bizCol, picked.ownerCol);
   } catch (e) {
     setSheetStatus("파일을 읽지 못했어요: " + (e && e.message ? e.message : e), "err");
     hideColPicker();
@@ -3507,7 +3909,7 @@ clientListInput.addEventListener("paste", function (e) {
   } else {
     setSheetStatus("붙여넣은 표에서 어느 열이 거래처명인지 판단하지 못했어요. 아래에서 직접 골라주세요.", "err");
   }
-  renderColPicker(picked.rows, picked.headerRow, picked.col, "붙여넣은 표", picked.bizCol);
+  renderColPicker(picked.rows, picked.headerRow, picked.col, "붙여넣은 표", picked.bizCol, picked.ownerCol);
 });
 
 sheetSyncBtn.addEventListener("click", function () { syncSheet(false); });
@@ -3648,8 +4050,9 @@ document.getElementById("logBtn").addEventListener("click", function () {
 });
 
 document.getElementById("clearAllBtn").addEventListener("click", function () {
+  if (!state.length) return;
+  pushUndo("전체 지우기 (" + state.length + "개)");
   closePreview();
-  state.forEach(releaseItem);
   state.length = 0;
   fileListEl.innerHTML = "";
   updateChrome();
