@@ -1,0 +1,3702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>파일명 자동 변환기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<style>
+  :root{
+    --bg:#F7F5FB;
+    --panel:#FFFFFF;
+    --ink:#312E3D;
+    --ink-soft:#6A6680;
+    --line:#E6E0F2;
+    --lavender:#B7A6E0;
+    --lavender-deep:#8F79C7;
+    --lavender-wash:#EFE9FA;
+    --mint:#9FD9BE;
+    --mint-deep:#5FAE8B;
+    --mint-wash:#E4F6ED;
+    --peach:#F0B7B0;
+    --peach-deep:#D4837A;
+    --peach-wash:#FBEAE7;
+    --sky:#A9C8EE;
+    --sky-wash:#E9F1FC;
+    --radius:14px;
+    --shadow:0 6px 20px rgba(143,121,199,0.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    /* 한글은 고운돋움(부드럽고 동글동글하면서 획이 또렷해 잘 읽힘), 영문·숫자는 Fredoka.
+       굵기는 500까지만 써서 브라우저가 억지로 굵게 덧그리지 않도록 함 */
+    font-family:"Fredoka","Gowun Dodum","맑은 고딕","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    font-weight:400;
+    line-height:1.75;
+    min-height:100vh;
+    letter-spacing:0.1px;
+    /* 획을 아주 살짝 두껍게 그려 또렷하게 (억지 굵게와 달리 뭉치지 않음) */
+    -webkit-text-stroke-width:0.2px;
+  }
+  .wrap{
+    max-width:980px;
+    margin:0 auto;
+    padding:48px 24px 80px;
+  }
+  header.top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:24px;
+    margin-bottom:36px;
+    flex-wrap:wrap;
+  }
+  .title-block h1{
+    font-size:26px;
+    font-weight:600;
+    margin:0 0 8px;
+    color:var(--ink);
+    font-family:"Fredoka","Gowun Dodum","맑은 고딕","Malgun Gothic",sans-serif;
+  }
+  .title-block p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:14.5px;
+    max-width:520px;
+  }
+  .format-chip{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 12px;
+    box-shadow:var(--shadow);
+    font-size:11px;
+    color:var(--ink-soft);
+    min-width:0;
+  }
+  .format-chip .rule{
+    font-size:12px;
+    font-weight:500;
+    color:var(--lavender-deep);
+    letter-spacing:0.1px;
+  }
+  .format-chip .rule span{color:var(--mint-deep);}
+  .format-chip .rule span.d{color:var(--peach-deep);}
+
+  /* drop zone hero */
+  #dropzone{
+    position:relative;
+    background:linear-gradient(135deg,var(--lavender-wash) 0%, var(--sky-wash) 55%, var(--mint-wash) 100%);
+    border:2px dashed var(--lavender);
+    border-radius:16px;
+    padding:26px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .2s ease, transform .15s ease;
+  }
+  #dropzone.dragover{
+    border-color:var(--mint-deep);
+    transform:scale(1.01);
+  }
+  #dropzone svg{width:42px;height:42px;margin-bottom:8px;}
+  #dropzone h2{
+    margin:0 0 4px;
+    font-size:15.5px;
+    font-weight:500;
+    color:var(--ink);
+  }
+  #dropzone p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:12.5px;
+  }
+  #dropzone input[type=file]{display:none;}
+  .browse-btn{
+    display:inline-block;
+    margin-top:10px;
+    padding:7px 16px;
+    background:var(--lavender-deep);
+    color:#fff;
+    border-radius:999px;
+    font-size:12.5px;
+    font-weight:400;
+  }
+
+  section.results{margin-top:38px;}
+  section.results h3{
+    font-size:15px;
+    font-weight:500;
+    color:var(--ink);
+    margin:0 0 14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .count-badge{
+    background:var(--lavender-wash);
+    color:var(--lavender-deep);
+    font-size:12px;
+    font-weight:500;
+    padding:2px 9px;
+    border-radius:999px;
+  }
+
+  .file-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px 20px;
+    margin-bottom:14px;
+  }
+  .file-card .row1{
+    display:flex;
+    align-items:flex-start;
+    gap:14px;
+  }
+  .file-icon{
+    flex:none;
+    width:38px;height:38px;
+    border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;
+    font-weight:500;
+    color:#fff;
+  }
+  .file-icon.pdf{background:var(--peach-deep);}
+  .file-icon.img{background:var(--sky);}
+  .file-icon.xlsx{background:var(--mint-deep);}
+  .file-icon.doc{background:var(--lavender-deep);}
+  .file-icon.other{background:var(--ink-soft);}
+
+  .file-meta{flex:1;min-width:0;}
+  .orig-name{
+    font-size:13px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    margin-bottom:2px;
+  }
+  .status-line{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12.5px;
+    flex-wrap:nowrap;
+    overflow:hidden;
+  }
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:2px 10px;
+    border-radius:999px;
+    font-weight:500;
+    font-size:11.5px;
+    flex:none;
+  }
+  .badge.ok{background:var(--mint-wash);color:var(--mint-deep);}
+  .badge.warn{background:var(--peach-wash);color:var(--peach-deep);}
+  .badge.busy{background:var(--sky-wash);color:#5A7DA8;}
+  .method-tag{
+    color:var(--ink-soft);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .fields{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+  .fields.fields-hidden{display:none;}
+  .edit-toggle{
+    flex:none;
+    border:none;
+    background:transparent;
+    color:var(--lavender-deep);
+    font-size:12px;
+    font-weight:400;
+    cursor:pointer;
+    padding:4px 6px;
+  }
+  .field label{
+    display:block;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+    font-weight:400;
+  }
+  .field input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-size:13.5px;
+    font-family:inherit;
+    color:var(--ink);
+    background:#FCFBFF;
+  }
+  .field input:focus{outline:2px solid var(--lavender);outline-offset:1px;}
+  .debug-field{grid-column:1 / -1;}
+  .debug-text{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-family:"Consolas","Malgun Gothic",monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    background:#F5F3FA;
+    resize:vertical;
+  }
+
+  .preview-row{
+    margin-top:14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--lavender-wash);
+    border-radius:10px;
+    padding:10px 14px;
+    flex-wrap:wrap;
+  }
+  .preview-row .label{
+    font-size:11.5px;
+    font-weight:500;
+    color:var(--lavender-deep);
+    flex:none;
+  }
+  .preview-row .name{
+    font-size:14px;
+    font-weight:500;
+    color:var(--ink);
+    flex:1;
+    min-width:80px;
+    display:flex;
+    align-items:center;
+    gap:0;
+    overflow:hidden;
+  }
+  /* 파일명 조각 : 클릭하면 해당 입력칸으로 바로 이동 */
+  .np{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    cursor:pointer;
+    border-radius:5px;
+    padding:1px 2px;
+  }
+  .np:hover{background:#fff;text-decoration:underline;}
+  .np-sep,.np-ext{color:var(--ink-soft);font-weight:400;flex:none;margin:0 1px;}
+  .np-miss + .np-sep,.np-sep + .np-miss{margin:0 3px;}
+  .np-miss{
+    flex:none;
+    border:1px dashed var(--peach-deep);
+    background:var(--peach-wash);
+    color:var(--peach-deep);
+    border-radius:6px;
+    padding:1px 9px;
+    font-size:12px;
+    font-weight:500;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  .np-miss:hover{background:var(--peach-deep);color:#fff;}
+  .field input.miss{
+    border-color:var(--peach-deep);
+    background:var(--peach-wash);
+  }
+  .review-hint{
+    color:var(--peach-deep);
+    font-size:11.5px;
+    flex:none;
+    max-width:220px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .preview-row .dl{
+    flex:none;
+    background:var(--lavender-deep);
+    color:#fff;
+    border:none;
+    padding:7px 16px;
+    border-radius:999px;
+    font-size:12.5px;
+    font-weight:400;
+    cursor:pointer;
+  }
+  .preview-row .dl:hover{background:var(--ink);}
+  .remove-btn{
+    flex:none;
+    border:none;
+    background:transparent;
+    color:var(--peach-deep);
+    font-size:12px;
+    cursor:pointer;
+    padding:4px 6px;
+  }
+
+  .client-panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px 20px;
+    margin-bottom:22px;
+  }
+  .client-panel-head{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:none;
+    border:none;
+    padding:2px 0;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .client-panel-head span:first-child{
+    font-size:14px;
+    font-weight:500;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .client-panel-head span:first-child::before{
+    content:"▸";
+    color:var(--lavender-deep);
+    font-size:11px;
+    transition:transform .15s ease;
+  }
+  .client-panel.open .client-panel-head span:first-child::before{
+    transform:rotate(90deg);
+  }
+  .client-panel-body{
+    margin-top:12px;
+  }
+  .client-count{
+    font-size:12px;
+    color:var(--mint-deep);
+    font-weight:500;
+  }
+  .client-desc{
+    margin:0 0 10px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  #clientListInput{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    font-family:inherit;
+    font-size:13px;
+    color:var(--ink);
+    background:#FCFBFF;
+    resize:vertical;
+  }
+  #clientListInput:focus{outline:2px solid var(--lavender);outline-offset:1px;}
+  .save-client-btn{
+    margin-top:10px;
+    background:var(--lavender-deep);
+    color:#fff;
+    border:none;
+    padding:8px 18px;
+    border-radius:999px;
+    font-size:12.5px;
+    font-weight:400;
+    cursor:pointer;
+  }
+  .save-client-btn:hover{background:var(--ink);}
+  .client-btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .export-client-btn{
+    margin-top:10px;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:8px 16px;
+    border-radius:999px;
+    font-family:inherit;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .export-client-btn:hover{border-color:var(--lavender);color:var(--lavender-deep);}
+
+  /* 구글시트 연결 */
+  .sheet-box{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+  }
+  .sheet-head{
+    font-size:12.5px;
+    font-weight:500;
+    color:var(--ink);
+    margin-bottom:8px;
+  }
+  .sheet-row{display:flex;gap:8px;flex-wrap:wrap;}
+  #sheetUrl{
+    flex:1;
+    min-width:220px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 11px;
+    font-family:inherit;
+    font-size:12.5px;
+    color:var(--ink);
+    background:#FCFBFF;
+  }
+  #sheetUrl:focus{outline:2px solid var(--lavender);outline-offset:1px;}
+  .sheet-btn{
+    flex:none;
+    background:var(--mint-deep);
+    color:#fff;
+    border:none;
+    padding:8px 18px;
+    border-radius:999px;
+    font-size:12.5px;
+    font-weight:400;
+    cursor:pointer;
+  }
+  .sheet-btn:hover{background:var(--ink);}
+  .sheet-btn:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .sheet-status{
+    margin-top:8px;
+    font-size:12px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+  .sheet-status.ok{color:var(--mint-deep);font-weight:400;}
+  .sheet-status.err{color:var(--peach-deep);}
+  .sheet-auto{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-top:8px;
+    font-size:12px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .sheet-help{margin-top:8px;font-size:11.5px;color:var(--ink-soft);}
+  .sheet-help summary{cursor:pointer;color:var(--lavender-deep);font-weight:400;}
+  .sheet-help p{margin:7px 0;line-height:1.7;}
+  .sheet-help b{color:var(--ink);}
+  .sheet-help .warn-line{
+    background:var(--peach-wash);
+    border-radius:8px;
+    padding:8px 10px;
+    color:var(--peach-deep);
+  }
+  .sheet-help .warn-line b{color:var(--peach-deep);}
+  .sheet-lead{margin:0 0 10px;font-size:12px;color:var(--ink-soft);}
+  .sheet-note{margin:10px 0 0;font-size:11.5px;color:var(--ink-soft);line-height:1.7;}
+  .sheet-note b{color:var(--ink);}
+  .sheet-tip{
+    margin:10px 0 0;
+    font-size:12px;
+    color:var(--ink-soft);
+    line-height:1.7;
+    background:var(--mint-wash);
+    border-radius:10px;
+    padding:10px 12px;
+  }
+  .sheet-tip b{color:var(--mint-deep);}
+  .client-drop{
+    border:2px dashed var(--lavender);
+    background:var(--lavender-wash);
+    border-radius:12px;
+    padding:14px 16px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .client-drop.dragover{border-color:var(--mint-deep);background:var(--mint-wash);}
+  .client-drop b{display:block;font-size:12.5px;color:var(--ink);}
+  .client-drop span{display:block;margin-top:4px;font-size:11.5px;color:var(--ink-soft);}
+  .client-drop input[type=file]{display:none;}
+  .mini-btn{
+    display:inline-block;
+    margin-top:9px;
+    background:var(--lavender-deep);
+    color:#fff;
+    border-radius:999px;
+    padding:5px 15px;
+    font-size:12px;
+    font-weight:400;
+    cursor:pointer;
+  }
+  .mini-btn:hover{background:var(--ink);}
+
+  /* 열 직접 고르기 */
+  .col-picker{
+    margin-top:10px;
+    background:var(--sky-wash);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px 14px;
+  }
+  .col-picker .cp-title{
+    font-size:12.5px;
+    font-weight:500;
+    color:var(--ink);
+    margin-bottom:8px;
+  }
+  .col-picker .cp-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:flex-end;
+  }
+  .col-picker .cp-field{flex:1;min-width:180px;}
+  .col-picker label{
+    display:block;
+    font-size:11.5px;
+    font-weight:400;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .col-picker select{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:7px 9px;
+    font-family:inherit;
+    font-size:12.5px;
+    color:var(--ink);
+    background:#fff;
+  }
+  .col-picker .cp-preview{
+    margin-top:9px;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    line-height:1.7;
+    word-break:break-all;
+  }
+  .col-picker .cp-preview b{color:var(--ink);}
+  .col-picker .cp-actions{display:flex;gap:8px;margin-top:10px;}
+  .cp-apply{
+    background:var(--mint-deep);
+    color:#fff;
+    border:none;
+    padding:7px 16px;
+    border-radius:999px;
+    font-size:12.5px;
+    font-weight:400;
+    cursor:pointer;
+  }
+  .cp-apply:hover{background:var(--ink);}
+  .cp-apply:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .cp-close{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:7px 14px;
+    border-radius:999px;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+
+  .fmt-select{
+    flex:none;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:6px 8px;
+    font-family:inherit;
+    font-size:12.5px;
+    color:var(--ink);
+    background:#FCFBFF;
+  }
+  .fmt-note{
+    width:100%;
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+
+  .bulk-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:22px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .bulk-bar .note{font-size:12.5px;color:var(--ink-soft);}
+  .zip-opt{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12.5px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .zip-btn{
+    background:var(--mint-deep);
+    color:#fff;
+    border:none;
+    padding:12px 26px;
+    border-radius:999px;
+    font-size:14px;
+    font-weight:500;
+    cursor:pointer;
+    box-shadow:var(--shadow);
+  }
+  .zip-btn:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .clear-btn{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:11px 20px;
+    border-radius:999px;
+    font-size:13px;
+    cursor:pointer;
+  }
+
+  .folder-btn{
+    margin-left:6px;
+    background:transparent;
+    border:1px solid var(--lavender-deep);
+    color:var(--lavender-deep);
+  }
+  .folder-btn:hover{background:var(--lavender-deep);color:#fff;}
+
+  /* 여러 파일 한 번에 지정 */
+  .bulk-edit{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:12px 18px;
+    margin-bottom:14px;
+  }
+  .be-head{display:flex;align-items:center;gap:12px;}
+  .be-all{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);cursor:pointer;}
+  .be-count{font-size:12px;color:var(--lavender-deep);font-weight:500;}
+  .be-body{
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+  .be-body.hidden{display:none;}
+  .be-field{flex:1;min-width:150px;}
+  .be-field label{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-bottom:4px;}
+  .be-field input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-family:inherit;
+    font-size:13px;
+    color:var(--ink);
+    background:#FCFBFF;
+  }
+  .be-field input:focus{outline:2px solid var(--lavender);outline-offset:1px;}
+  .be-apply{
+    flex:none;
+    background:var(--mint-deep);
+    color:#fff;
+    border:none;
+    padding:9px 18px;
+    border-radius:999px;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .be-apply:hover{background:var(--ink);}
+  .be-apply:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .pick-box{
+    flex:none;
+    width:17px;
+    height:17px;
+    margin-top:2px;
+    cursor:pointer;
+  }
+
+  .progress-bar{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-top:20px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px 18px;
+  }
+  .pg-info{flex:1;min-width:0;}
+  .pg-text{
+    display:block;
+    font-size:12.5px;
+    color:var(--ink);
+    margin-bottom:7px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .pg-track{
+    height:7px;
+    background:var(--lavender-wash);
+    border-radius:999px;
+    overflow:hidden;
+  }
+  .pg-fill{
+    height:100%;
+    width:0%;
+    background:var(--lavender-deep);
+    border-radius:999px;
+    transition:width .2s ease;
+  }
+  .pg-cancel{
+    flex:none;
+    border:1px solid var(--peach-deep);
+    background:transparent;
+    color:var(--peach-deep);
+    border-radius:999px;
+    padding:7px 16px;
+    font-family:inherit;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .pg-cancel:hover{background:var(--peach-deep);color:#fff;}
+  .pg-cancel:disabled{opacity:.5;cursor:not-allowed;}
+
+  .empty-hint{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13px;
+    padding:30px 0;
+  }
+  .scan-note{
+    margin-top:24px;
+    text-align:center;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .scan-note b{color:var(--ink);}
+
+  @media (max-width:640px){
+    .fields{grid-template-columns:1fr;}
+    header.top{flex-direction:column;}
+    .format-chip{min-width:0;width:100%;}
+  }
+
+  /* ===== v10 추가: 인식 근거 / 후보 / 신뢰도 ===== */
+  .src-tag{
+    display:inline-block;
+    margin-left:6px;
+    font-size:10.5px;
+    font-weight:400;
+    padding:1px 7px;
+    border-radius:999px;
+    vertical-align:middle;
+  }
+  .src-tag.high{background:var(--mint-wash);color:var(--mint-deep);}
+  .src-tag.mid{background:var(--sky-wash);color:#5A7DA8;}
+  .src-tag.low{background:var(--peach-wash);color:var(--peach-deep);}
+  .src-tag.none{background:#F0EEF6;color:var(--ink-soft);}
+
+  .cands{
+    grid-column:1 / -1;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-top:-2px;
+  }
+  .cands .cands-label{
+    font-size:11px;
+    color:var(--ink-soft);
+    font-weight:400;
+    flex:none;
+  }
+  .chip{
+    border:1px solid var(--line);
+    background:#FCFBFF;
+    color:var(--ink);
+    border-radius:999px;
+    padding:3px 11px;
+    font-size:11.5px;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  .chip:hover{background:var(--lavender-wash);border-color:var(--lavender);}
+  .chip .chip-why{color:var(--ink-soft);font-size:10.5px;margin-left:4px;}
+
+  .evidence{
+    grid-column:1 / -1;
+    background:#F5F3FA;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    line-height:1.7;
+  }
+  .evidence b{color:var(--ink);font-weight:500;}
+  .evidence .ev-line{
+    display:block;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  /* ===== 파일 미리보기 ===== */
+  .file-thumb{
+    flex:none;
+    position:relative;
+    width:46px;
+    height:58px;
+    padding:0;
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    cursor:pointer;
+    background:var(--panel);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:inherit;
+  }
+  .file-thumb img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;}
+  .file-thumb .tlabel{
+    font-size:13px;
+    font-weight:500;
+    color:#fff;
+    letter-spacing:0.2px;
+  }
+  .file-thumb.pdf{background:var(--peach-deep);border-color:var(--peach-deep);}
+  .file-thumb.img{background:var(--sky);border-color:var(--sky);}
+  .file-thumb.xlsx{background:var(--mint-deep);border-color:var(--mint-deep);}
+  .file-thumb.doc{background:var(--lavender-deep);border-color:var(--lavender-deep);}
+  .file-thumb.other{background:var(--ink-soft);border-color:var(--ink-soft);}
+  .file-thumb.has-img{background:var(--panel);border-color:var(--line);}
+  .file-thumb .tzoom{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(49,46,61,0.55);
+    color:#fff;
+    font-size:15px;
+    opacity:0;
+    transition:opacity .15s ease;
+  }
+  .file-thumb:hover .tzoom{opacity:1;}
+
+  [hidden]{display:none !important;}
+  .pv-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(49,46,61,0.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px;
+    z-index:50;
+  }
+  .pv-box{
+    background:var(--panel);
+    border-radius:16px;
+    box-shadow:0 18px 50px rgba(49,46,61,0.25);
+    width:min(980px,100%);
+    max-height:100%;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .pv-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    flex:none;
+  }
+  .pv-title{
+    flex:1;
+    min-width:0;
+    font-size:13.5px;
+    font-weight:500;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .pv-nav{display:flex;align-items:center;gap:8px;flex:none;font-size:12.5px;color:var(--ink-soft);}
+  .pv-nav button{
+    border:1px solid var(--line);
+    background:#FCFBFF;
+    color:var(--ink);
+    border-radius:8px;
+    padding:4px 10px;
+    font-family:inherit;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .pv-nav button:disabled{color:#C9C5D6;cursor:not-allowed;}
+  .pv-close{
+    flex:none;
+    border:none;
+    background:var(--lavender-deep);
+    color:#fff;
+    border-radius:999px;
+    padding:6px 15px;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .pv-close:hover{background:var(--ink);}
+  .pv-body{
+    flex:1;
+    overflow:auto;
+    background:var(--bg);
+    padding:16px;
+    text-align:center;
+  }
+  .pv-body img,.pv-body canvas{
+    max-width:100%;
+    border-radius:8px;
+    box-shadow:0 4px 16px rgba(49,46,61,0.14);
+    background:#fff;
+  }
+  .pv-body pre{
+    text-align:left;
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-all;
+    font-family:"Consolas","Malgun Gothic",monospace;
+    font-size:12.5px;
+    line-height:1.8;
+    color:var(--ink);
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .pv-msg{color:var(--ink-soft);font-size:13px;padding:40px 0;}
+
+  .evidence .ev-learn{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap;}
+  .learn-chip{
+    border-color:var(--mint-deep);
+    background:var(--mint-wash);
+    color:var(--mint-deep);
+    font-weight:500;
+  }
+  .learn-chip:hover{background:var(--mint-deep);border-color:var(--mint-deep);color:#fff;}
+  .evidence details{margin-top:6px;}
+  .evidence summary{cursor:pointer;color:var(--lavender-deep);font-weight:400;}
+
+  .badge.review{background:var(--sky-wash);color:#5A7DA8;}
+
+  .opt-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+  .opt-row label{
+    font-size:12.5px;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="title-block">
+      <h1>File Name Automatic Converter</h1>
+    </div>
+    <div class="format-chip">
+      <div class="rule">기본 : 문서종류_<span>거래처명</span>(법인회사는 주식회사 제외)_<span class="d">날짜</span></div>
+    </div>
+  </header>
+
+  <div class="client-panel">
+    <button class="client-panel-head" id="clientPanelToggle" type="button">
+      <span>자주 쓰는 거래처 목록 (선택)</span>
+      <span class="client-count" id="clientCount">0개 저장됨</span>
+    </button>
+    <div class="client-panel-body" id="clientPanelBody" style="display:none;">
+      <p class="client-desc">한 줄에 하나씩 거래처명을 적어두면 문서에서 그 이름을 먼저 찾아요. <b>거래처명 뒤에 사업자등록번호를 같이 적으면</b> 상호 표기가 다르거나 스캔이 흐려도 번호만 맞으면 거래처가 확정됩니다. 이 브라우저에만 저장되고 다음에 다시 열어도 유지돼요.</p>
+      <textarea id="clientListInput" rows="4" placeholder="예)&#10;대한상사, 123-45-67890&#10;미래물산, 210-81-12345&#10;홍길동"></textarea>
+      <div class="client-btn-row">
+        <button class="save-client-btn" id="saveClientListBtn">목록 저장</button>
+        <button class="export-client-btn" id="exportClientBtn">목록 내려받기 (CSV)</button>
+      </div>
+
+      <div class="sheet-box">
+        <div class="sheet-head">구글시트에서 가져오기</div>
+        <p class="sheet-lead">시트 공유 설정을 바꾸지 않고 가져오는 방법이에요. 둘 중 편한 쪽을 쓰시면 됩니다.</p>
+
+        <div id="clientDrop" class="client-drop">
+          <b>방법 1 · 시트 파일을 여기에 끌어다 놓기</b>
+          <span>구글시트에서 <b>파일 → 다운로드 → 쉼표로 구분된 값(.csv)</b> 또는 <b>Microsoft Excel(.xlsx)</b></span>
+          <label class="mini-btn" for="clientFileInput">파일 선택</label>
+          <input type="file" id="clientFileInput" accept=".csv,.tsv,.txt,.xlsx,.xls">
+        </div>
+
+        <p class="sheet-tip"><b>방법 2 · 복사해서 붙여넣기</b> · 구글시트에서 거래처명이 있는 칸을 선택하고 <b>Ctrl+C</b> → 맨 위 입력칸에 <b>Ctrl+V</b>. 여러 열을 통째로 붙여넣어도 거래처명 열만 골라냅니다.</p>
+
+        <div class="sheet-status" id="sheetStatus"></div>
+        <div class="col-picker" id="colPicker" style="display:none;"></div>
+
+        <details class="sheet-help">
+          <summary>주소로 자동 연결하기 (공유 설정을 바꿀 수 있을 때만)</summary>
+          <p>이 변환기는 서버 없이 브라우저에서만 동작해서 <b>구글 로그인을 할 수 없어요.</b> 그래서 <b>액세스 권한이 있는 사용자만</b>으로 제한된 시트는 주소로 읽어올 수 없습니다. 아래는 공유 설정을 바꿀 수 있는 경우에만 쓰세요.</p>
+          <div class="sheet-row">
+            <input type="url" id="sheetUrl" placeholder="구글시트 주소를 붙여넣으세요">
+            <button class="sheet-btn" id="sheetSyncBtn">불러오기</button>
+          </div>
+          <label class="sheet-auto"><input type="checkbox" id="sheetAuto"> 페이지를 열 때마다 자동으로 다시 불러오기</label>
+          <p><b>준비</b> · <b>파일 → 공유 → 웹에 게시</b> → 형식을 <b>.csv</b>로 게시하거나, <b>공유 → 링크가 있는 모든 사용자 → 뷰어</b></p>
+          <p class="warn-line"><b>주의</b> · 두 방법 모두 <b>주소를 아는 사람은 누구나 시트를 볼 수 있게</b> 됩니다.</p>
+        </details>
+
+        <p class="sheet-note"><b>표 형태</b> · 첫 줄에 <b>거래처명</b>(또는 상호·업체·회사·고객사·관여처) 머리글이 있으면 그 열을 읽고, 머리글이 없으면 첫 번째 열을 읽어요. 상호에 붙은 '주식회사'는 파일명에서 자동으로 빠집니다.</p>
+      </div>
+
+      <div class="opt-row">
+        <label><input type="checkbox" id="optUseFileName" checked> 원본 파일명에 들어있는 날짜·거래처도 참고</label>
+        <label title="메일이나 홈택스에서 내려받은 파일은 수정일이 '내려받은 날'이라 실제 서류 날짜와 다를 수 있어요."><input type="checkbox" id="optUseFileDate"> 날짜를 못 찾으면 파일 수정일 사용 (부정확할 수 있음)</label>
+        <label><input type="checkbox" id="optForceOcr"> 텍스트가 있어도 인식이 부족하면 OCR 재시도</label>
+      </div>
+    </div>
+  </div>
+
+  <div id="dropzone">
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="14" width="34" height="42" rx="4" fill="#FFFFFF" stroke="#8F79C7" stroke-width="2"/>
+      <line x1="16" y1="24" x2="38" y2="24" stroke="#B7A6E0" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16" y1="31" x2="38" y2="31" stroke="#B7A6E0" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16" y1="38" x2="30" y2="38" stroke="#B7A6E0" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="46" cy="46" r="13" fill="#9FD9BE"/>
+      <path d="M40 46 L45 51 L53 41" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <h2>파일을 여기로 끌어다 놓아주세요</h2>
+    <p>또는 클릭해서 파일을 선택하세요 · PDF, JPG, PNG, XLSX, XLS, DOCX, CSV, TXT</p>
+    <label class="browse-btn" for="fileInput">파일 선택</label>
+    <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.bmp,.gif,.webp,.xlsx,.xls,.csv,.docx,.doc,.txt,.hwp">
+    <label class="browse-btn folder-btn" for="folderInput">폴더 선택</label>
+    <input type="file" id="folderInput" webkitdirectory directory multiple>
+  </div>
+
+  <div class="progress-bar" id="progressBar" style="display:none;">
+    <div class="pg-info">
+      <span class="pg-text" id="pgText"></span>
+      <div class="pg-track"><div class="pg-fill" id="pgFill"></div></div>
+    </div>
+    <button type="button" class="pg-cancel" id="pgCancel">중단</button>
+  </div>
+
+  <section class="results">
+    <h3>처리 목록 <span class="count-badge" id="countBadge">0</span></h3>
+    <div id="fileList"></div>
+    <div class="empty-hint" id="emptyHint">아직 업로드된 파일이 없어요.</div>
+
+    <div class="bulk-edit" id="bulkEdit" style="display:none;">
+      <div class="be-head">
+        <label class="be-all"><input type="checkbox" id="beAll"> 전체 선택</label>
+        <span class="be-count" id="beCount">0개 선택됨</span>
+      </div>
+      <div class="be-body">
+        <div class="be-field"><label>거래처명</label><input type="text" id="beClient" placeholder="선택한 파일에 한 번에 적용"></div>
+        <div class="be-field"><label>문서종류</label><input type="text" id="beType" placeholder="비워두면 그대로 둠"></div>
+        <div class="be-field"><label>날짜</label><input type="text" id="beDate" placeholder="예: 25.03.14"></div>
+        <button type="button" class="be-apply" id="beApply">선택한 파일에 적용</button>
+      </div>
+    </div>
+
+    <div class="bulk-bar" id="bulkBar" style="display:none;">
+      <label class="zip-opt"><input type="checkbox" id="optZipGroup" checked> ZIP 안에서 거래처별 폴더로 묶기</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="clear-btn" id="logBtn">처리 이력 (CSV)</button>
+        <button class="clear-btn" id="clearAllBtn">전체 지우기</button>
+        <button class="zip-btn" id="zipBtn">전체 압축 다운로드 (ZIP)</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="pv-backdrop" id="pvBackdrop" hidden>
+    <div class="pv-box" role="dialog" aria-modal="true" aria-label="파일 미리보기">
+      <div class="pv-head">
+        <span class="pv-title" id="pvTitle"></span>
+        <span class="pv-nav" id="pvNav"></span>
+        <button type="button" class="pv-close" id="pvClose">닫기</button>
+      </div>
+      <div class="pv-body" id="pvBody"></div>
+    </div>
+  </div>
+
+  <p class="scan-note"><b>안내사항</b> · 도장이나 서명이 찍힌 스캔본, 사진처럼 텍스트가 없는 문서는 자동 인식이 잘 안 될 수 있어요. 이런 경우 '수정'을 눌러 직접 입력해주세요.</p>
+
+</div>
+<script>
+/* =========================================================
+   파일명 자동 변환기 v10
+   - 문서를 "줄 + 글자크기" 단위로 재구성해서 제목을 먼저 찾음
+   - 문서종류/거래처/날짜를 후보 목록 + 점수로 뽑고 근거를 표시
+   - PDF 메타데이터, 원본 파일명, 파일 작성일까지 보조 근거로 사용
+========================================================= */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+const IMG_EXTS = ["jpg", "jpeg", "png", "bmp", "gif", "webp"];
+
+/* ---------------------------------------------------------
+   공통 유틸
+--------------------------------------------------------- */
+function pad2(n) { return String(n).padStart(2, "0"); }
+function getExt(filename) {
+  const i = filename.lastIndexOf(".");
+  return i === -1 ? "" : filename.slice(i + 1).toLowerCase();
+}
+function sanitize(s) {
+  return (s || "").replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim();
+}
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+// 전각/특수 공백, 유사기호를 정규화해서 정규식 매칭 실패를 줄임
+function normalizeText(s) {
+  return (s || "")
+    .replace(/[​‌‍﻿]/g, "")
+    .replace(/[ 　]/g, " ")
+    .replace(/[·․‧]/g, ".")
+    .replace(/[－–—]/g, "-")
+    .replace(/／/g, "/")
+    .replace(/：/g, ":")
+    .replace(/（/g, "(").replace(/）/g, ")")
+    .replace(/[\t ]+/g, " ");
+}
+
+/* ---------------------------------------------------------
+   1) 텍스트 추출 : 좌표/글자크기를 살린 "줄" 배열로 만든다
+   line = { t: 줄 텍스트, size: 글자높이, page: 페이지번호, order: 페이지내 순번 }
+--------------------------------------------------------- */
+
+// pdf.js 조각들을 y좌표로 묶어 실제 줄로 복원 (한 글자씩 흩어지는 문제 방지)
+function pdfItemsToLines(items, pageNo) {
+  const rows = [];
+  for (const it of items) {
+    if (!it.str || !it.str.trim()) continue;
+    const x = it.transform[4];
+    const y = it.transform[5];
+    const h = it.height || Math.abs(it.transform[3]) || 10;
+    let row = null;
+    for (const r of rows) {
+      if (Math.abs(r.y - y) <= Math.max(2, h * 0.6)) { row = r; break; }
+    }
+    if (!row) { row = { y: y, size: h, parts: [] }; rows.push(row); }
+    row.size = Math.max(row.size, h);
+    row.parts.push({ x: x, w: it.width || 0, s: it.str });
+  }
+  rows.sort(function (a, b) { return b.y - a.y; }); // PDF 좌표는 아래쪽이 0
+  const out = [];
+  rows.forEach(function (r, i) {
+    r.parts.sort(function (a, b) { return a.x - b.x; });
+    let t = "";
+    let prev = null;
+    for (const p of r.parts) {
+      if (prev) {
+        const gap = p.x - (prev.x + prev.w);
+        if (gap > r.size * 0.22) t += " ";
+      }
+      t += p.s;
+      prev = p;
+    }
+    t = normalizeText(t).trim();
+    if (t) out.push({ t: t, size: r.size, page: pageNo, order: i });
+  });
+  return out;
+}
+
+// Tesseract 결과에서 줄 단위(+글자높이)를 뽑아냄. 버전별 구조 차이를 모두 흡수.
+function ocrToLines(data, pageNo) {
+  const out = [];
+  function push(l) {
+    const t = normalizeText(l && l.text ? l.text : "").trim();
+    if (!t) return;
+    const b = l.bbox || {};
+    const size = (b.y1 != null && b.y0 != null) ? (b.y1 - b.y0) : 0;
+    out.push({ t: t, size: size, page: pageNo, order: 0, _y: b.y0 || 0 });
+  }
+  if (Array.isArray(data.blocks)) {
+    data.blocks.forEach(function (b) {
+      (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(push); });
+    });
+  }
+  if (!out.length && Array.isArray(data.lines)) data.lines.forEach(push);
+  if (!out.length) {
+    (data.text || "").split(/\r?\n/).forEach(function (t) {
+      const v = normalizeText(t).trim();
+      if (v) out.push({ t: v, size: 0, page: pageNo, order: 0, _y: out.length });
+    });
+  }
+  out.sort(function (a, b) { return (a._y || 0) - (b._y || 0); });
+  out.forEach(function (l, i) { l.order = i; });
+  return out;
+}
+
+// 일반 텍스트(엑셀/워드/txt)는 크기 정보가 없으므로 줄 순서만 사용
+function plainToLines(text, pageNo) {
+  return normalizeText(text).split(/\r?\n/)
+    .map(function (t) { return t.trim(); })
+    .filter(Boolean)
+    .map(function (t, i) { return { t: t, size: 0, page: pageNo || 1, order: i }; });
+}
+
+function linesToText(lines) {
+  return lines.map(function (l) { return l.t; }).join("\n");
+}
+
+/* 제목 가능성 점수(0~100)를 각 줄에 부여.
+   - 글자크기 정보가 있으면 "가장 큰 글자 = 제목"
+   - 없으면 "1페이지 앞쪽 = 제목" */
+function markTitleWeight(lines) {
+  const p1 = lines.filter(function (l) { return l.page === 1; });
+  const sizes = p1.map(function (l) { return l.size; }).filter(function (s) { return s > 0; });
+  const hasSize = sizes.length >= 3;
+  const maxSize = hasSize ? Math.max.apply(null, sizes) : 0;
+  const sorted = sizes.slice().sort(function (a, b) { return a - b; });
+  const median = hasSize ? sorted[Math.floor(sorted.length / 2)] : 0;
+
+  lines.forEach(function (l) {
+    let b = 10;
+    if (l.forcedTitle) {          // 엑셀 시트 이름 등, 제목으로 확정된 줄
+      l.titleWeight = 90;
+      return;
+    }
+    if (l.page !== 1) {
+      b = 8;
+    } else if (hasSize && l.size > 0) {
+      if (l.size >= maxSize * 0.92) b = 100;
+      else if (median > 0 && l.size >= median * 1.35) b = 70;
+      else if (l.order < 8) b = 40;
+      else b = 12;
+    } else {
+      if (l.order < 3) b = 85;
+      else if (l.order < 8) b = 55;
+      else if (l.order < 25) b = 25;
+      else b = 10;
+    }
+    l.titleWeight = b;
+  });
+  return lines;
+}
+
+/* ---------------------------------------------------------
+   OCR 워커 (한 번만 만들어 재사용 → 두 번째 파일부터 훨씬 빠름)
+--------------------------------------------------------- */
+let _ocrWorker = null;
+let _ocrWorkerFailed = false;
+let ocrProgress = null; // 진행률을 화면에 전달하는 콜백
+
+function ocrLog(m) {
+  if (!ocrProgress || !m) return;
+  if (m.status === "recognizing text") ocrProgress(m.progress || 0, "글자 읽는 중");
+  else if (/loading|initializ|download/i.test(m.status || "")) {
+    ocrProgress(m.progress || 0, "한글 인식 데이터 준비 중 (처음 한 번만)");
+  }
+}
+
+async function getOcrWorker() {
+  if (_ocrWorkerFailed) return null;
+  if (_ocrWorker) return _ocrWorker;
+  try {
+    _ocrWorker = await Tesseract.createWorker("kor+eng", 1, { logger: ocrLog });
+    return _ocrWorker;
+  } catch (e) {
+    console.warn("OCR 워커 생성 실패, 단발 인식으로 대체", e);
+    _ocrWorkerFailed = true;
+    return null;
+  }
+}
+
+async function terminateOcrWorker() {
+  if (!_ocrWorker) return;
+  const w = _ocrWorker;
+  _ocrWorker = null;
+  try { await w.terminate(); } catch (e) { /* 이미 종료됨 */ }
+}
+async function runOcr(canvas) {
+  const w = await getOcrWorker();
+  if (w) return (await w.recognize(canvas)).data;
+  return (await Tesseract.recognize(canvas, "kor+eng", { logger: ocrLog })).data;
+}
+
+// OCR 전처리: 도장(붉은색) 제거 + 흑백 + 대비 강화
+function preprocessForOCR(canvas) {
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  const contrast = 1.5;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i], g = d[i + 1], b = d[i + 2];
+    if (r > 120 && r - g > 40 && r - b > 40) { r = g = b = 255; }
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    let v = (gray - 128) * contrast + 128;
+    d[i] = d[i + 1] = d[i + 2] = Math.max(0, Math.min(255, v));
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+/* ---------------------------------------------------------
+   형식별 추출기 → { lines, method, meta }
+--------------------------------------------------------- */
+const MAX_TEXT_PAGES = 5;
+const MAX_OCR_PAGES = 4;   // 스캔본에서 추가로 읽어볼 최대 쪽수
+
+function parsePdfDate(v) {
+  const m = /D:(\d{4})(\d{2})(\d{2})/.exec(v || "");
+  if (!m) return null;
+  return { y: +m[1], m: +m[2], d: +m[3] };
+}
+
+async function ocrPdfPage(pdfDoc, pageNo, scale) {
+  const page = await pdfDoc.getPage(pageNo);
+  const viewport = page.getViewport({ scale: scale || 3 });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+  preprocessForOCR(canvas);
+  const data = await runOcr(canvas);
+  return ocrToLines(data, pageNo);
+}
+
+async function extractFromPDF(file, onStatus) {
+  const buf = await file.arrayBuffer();
+  const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+  const meta = {};
+  try {
+    const md = await pdfDoc.getMetadata();
+    if (md && md.info) {
+      meta.title = (md.info.Title || "").trim();
+      meta.created = parsePdfDate(md.info.CreationDate) || parsePdfDate(md.info.ModDate);
+    }
+  } catch (e) { /* 메타데이터가 없으면 무시 */ }
+
+  let lines = [];
+  const pageCount = Math.min(pdfDoc.numPages, MAX_TEXT_PAGES);
+  for (let i = 1; i <= pageCount; i++) {
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    lines = lines.concat(pdfItemsToLines(content.items, i));
+  }
+  const solidChars = linesToText(lines).replace(/\s/g, "").length;
+  if (solidChars >= 15) {
+    return { lines: lines, method: "텍스트 추출", meta: meta, pdfDoc: pdfDoc };
+  }
+  if (onStatus) onStatus("스캔 문서로 판단 · 고해상도 OCR 인식 중");
+  const ocrLines = await ocrPdfPage(pdfDoc, 1, 3);
+  return { lines: ocrLines, method: "OCR 인식", meta: meta, pdfDoc: pdfDoc };
+}
+
+async function extractFromImage(file, onStatus) {
+  if (onStatus) onStatus("이미지 문자 인식 중 (OCR)");
+  const bitmap = await createImageBitmap(file);
+  const scale = bitmap.width < 1500 ? 2 : 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width * scale;
+  canvas.height = bitmap.height * scale;
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  preprocessForOCR(canvas);
+  const data = await runOcr(canvas);
+  return { lines: ocrToLines(data, 1), method: "OCR 인식", meta: {} };
+}
+
+async function extractFromExcel(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const lines = [];
+  wb.SheetNames.forEach(function (name, si) {
+    // 시트 이름 자체가 문서종류인 경우가 많음 (예: '급여대장', '일용직')
+    const sheetName = normalizeText(name).trim();
+    if (sheetName && !/^(sheet|시트)\s*\d*$/i.test(sheetName)) {
+      lines.push({ t: sheetName, size: 0, page: si + 1, order: 0, forcedTitle: true });
+    }
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, blankrows: false, raw: false });
+    rows.forEach(function (r) {
+      const t = normalizeText((r || []).filter(function (c) { return c != null && String(c).trim(); }).join(" ")).trim();
+      if (t) lines.push({ t: t, size: 0, page: si + 1, order: 0 });
+    });
+  });
+  lines.forEach(function (l, i) { l.order = i; });
+  return { lines: lines, method: "엑셀 텍스트 추출", meta: {} };
+}
+
+async function extractFromDocx(file) {
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: buf });
+  return { lines: plainToLines(result.value, 1), method: "워드 텍스트 추출", meta: {} };
+}
+
+async function extractFromTxt(file) {
+  const text = await file.text();
+  return { lines: plainToLines(text, 1), method: "텍스트 파일", meta: {} };
+}
+
+async function extractDoc(file, onStatus) {
+  const ext = getExt(file.name);
+  try {
+    if (ext === "pdf") return await extractFromPDF(file, onStatus);
+    if (IMG_EXTS.includes(ext)) return await extractFromImage(file, onStatus);
+    if (["xlsx", "xls", "csv"].includes(ext)) return await extractFromExcel(file);
+    if (ext === "docx") return await extractFromDocx(file);
+    if (ext === "txt") return await extractFromTxt(file);
+    return { lines: [], method: "지원되지 않는 형식 · 파일명만 참고", meta: {} };
+  } catch (e) {
+    console.error(e);
+    return { lines: [], method: "분석 오류: " + (e && e.message ? e.message : e), meta: {} };
+  }
+}
+
+/* =========================================================
+   2) 문서종류 인식
+   - 사전 순서가 아니라 "제목 위치 점수 + 이름 구체성"으로 채점
+   - titleOnly 항목(정관/계약서/영수증 등 짧고 흔한 말)은 제목에서만 인정
+========================================================= */
+const DOC_TYPES = [
+  { n: "사업자등록증명원", re: [/사업자\s?등록\s?증명(원|서)?/] },
+  { n: "사업자등록증", re: [/사업자\s?등록\s?증/] },
+  { n: "휴업사실증명", re: [/휴업\s?사실\s?증명/] },
+  { n: "폐업사실증명", re: [/폐업\s?사실\s?증명/] },
+  { n: "납세증명서", re: [/납세\s?증명서/, /국세\s?납세\s?증명/] },
+  { n: "소득금액증명", re: [/소득\s?금액\s?증명/] },
+  { n: "부가가치세과세표준증명", re: [/부가가치세\s?과세표준\s?증명/] },
+  { n: "표준재무제표증명", re: [/표준\s?재무제표\s?증명/] },
+  { n: "법인등기부등본", re: [/등기사항\s?전부\s?증명서\s?\(?\s?말소사항/, /법인\s?등기부\s?등본/, /등기사항\s?전부\s?증명서/] },
+  { n: "법인인감증명서", re: [/법인\s?인감\s?증명/] },
+  { n: "인감증명서", re: [/인감\s?증명서/] },
+  { n: "주민등록등본", re: [/주민\s?등록\s?표?\s?등본/] },
+  { n: "가족관계증명서", re: [/가족\s?관계\s?증명서/] },
+  { n: "주주명부", re: [/주주\s?명부/] },
+  { n: "주식등변동상황명세서", re: [/주식\s?등\s?변동\s?상황\s?명세서/] },
+  { n: "주주총회의사록", re: [/(임시|정기)?\s?주주\s?총회\s?의사록/] },
+  { n: "이사회의사록", re: [/이사회\s?의사록/] },
+  { n: "정관", re: [/(^|[^가-힣])정\s?관([^가-힣]|$)/], titleOnly: true },
+  { n: "세금계산서합계표", re: [/세금\s?계산서\s?합계표/] },
+  { n: "계산서합계표", re: [/(^|[^금])계\s?산서\s?합계표/] },
+  { n: "세금계산서", re: [/(전자)?\s?세금\s?계산서/] },
+  { n: "거래명세서", re: [/거래\s?명세(서|표)/] },
+  { n: "견적서", re: [/견\s?적\s?서/] },
+  { n: "부가가치세신고서", re: [/부가\s?가치세[\s\S]{0,12}신고서/, /부가세[\s\S]{0,8}신고서/, /부가가치세\s?(확정|예정)\s?신고/] },
+  { n: "원천징수이행상황신고서", re: [/원천\s?징수\s?이행\s?상황\s?신고서/] },
+  { n: "원천징수영수증", re: [/원천\s?징수\s?영수증/, /소득자별\s?근로소득\s?원천징수부/] },
+  { n: "지급명세서", re: [/지급\s?명세서/] },
+  { n: "근로소득지급명세서", re: [/근로\s?소득\s?지급\s?명세서/] },
+  { n: "법인세신고서", re: [/법인세[\s\S]{0,16}신고서/, /법인세\s?과세표준\s?및\s?세액\s?신고/] },
+  { n: "종합소득세신고서", re: [/종합\s?소득세[\s\S]{0,20}신고/] },
+  { n: "양도소득세신고서", re: [/양도\s?소득세[\s\S]{0,16}신고/] },
+  { n: "상속세신고서", re: [/상속세[\s\S]{0,16}신고/] },
+  { n: "증여세신고서", re: [/증여세[\s\S]{0,16}신고/] },
+  { n: "지방소득세신고서", re: [/지방\s?소득세[\s\S]{0,16}신고/] },
+  { n: "세무조정계산서", re: [/세무\s?조정\s?계산서/, /조정후\s?수입금액\s?명세서/] },
+  { n: "재무상태표", re: [/재무\s?상태표/, /대차\s?대조표/] },
+  { n: "손익계산서", re: [/손익\s?계산서/] },
+  { n: "합계잔액시산표", re: [/합계\s?잔액\s?시산표/, /(^|[^가-힣])시산표/] },
+  { n: "계정별원장", re: [/계정별\s?원장/, /총계정\s?원장/] },
+  { n: "급여대장", re: [/급여\s?대장/, /임금\s?대장/, /보수\s?대장/] },
+  { n: "급여명세서", re: [/급여\s?명세서/, /임금\s?명세서/] },
+  // 인건비 관련 (대부분 엑셀로 받는 자료들)
+  { n: "사업소득대장", re: [/사업\s?소득\s?자?\s?(지급)?\s?대장/, /사업\s?소득\s?(지급)?\s?(내역|명세)서?/, /3\.3\s?%?\s?대장/] },
+  { n: "일용직대장", re: [/일용\s?(직|근로자?)?\s?(소득)?\s?(지급)?\s?대장/, /일용\s?근로\s?(소득)?\s?(지급)?\s?(내역|명세)서?/, /일용\s?노무비\s?대장/] },
+  { n: "상용직대장", re: [/상용\s?(직|근로자?)?\s?(소득)?\s?(지급)?\s?대장/] },
+  { n: "근로소득대장", re: [/근로\s?소득\s?(지급)?\s?대장/] },
+  { n: "인건비대장", re: [/인건비\s?(지급)?\s?(대장|내역서?|명세서?)/, /노무비\s?(대장|내역서?)/] },
+  { n: "간이지급명세서", re: [/간이\s?지급\s?명세서/] },
+  { n: "퇴직소득원천징수영수증", re: [/퇴직\s?소득\s?원천\s?징수\s?영수증/] },
+  { n: "퇴직금정산서", re: [/퇴직금\s?(중간)?\s?정산서?/] },
+  { n: "근로계약서", re: [/근로\s?계약서/] },
+  { n: "사업장가입자명부", re: [/사업장\s?가입자\s?명부/] },
+  { n: "부동산매매계약서", re: [/부동산\s?매매\s?계약서/, /매매\s?계약서/] },
+  { n: "부동산임대차계약서", re: [/부동산\s?임대차\s?계약서/, /임대차\s?계약서/] },
+  { n: "금전소비대차계약서", re: [/금전\s?소비\s?대차\s?계약서/] },
+  { n: "통장사본", re: [/통장\s?사본/] },
+  { n: "잔액증명서", re: [/잔액\s?증명서/] },
+  { n: "위임장", re: [/위\s?임\s?장/], titleOnly: true },
+  { n: "확인서", re: [/(^|[^가-힣])확\s?인\s?서([^가-힣]|$)/], titleOnly: true },
+  { n: "영수증", re: [/(^|[^가-힣])영\s?수\s?증([^가-힣]|$)/], titleOnly: true },
+  { n: "청구서", re: [/(^|[^가-힣])청\s?구\s?서([^가-힣]|$)/], titleOnly: true },
+  { n: "접수증", re: [/(^|[^가-힣])접\s?수\s?증([^가-힣]|$)/] },
+  { n: "계산서", re: [/(^|[^금가-힣])계\s?산\s?서([^가-힣]|$)/], titleOnly: true },
+  { n: "계약서", re: [/(^|[^가-힣])계\s?약\s?서([^가-힣]|$)/], titleOnly: true },
+  { n: "신고서", re: [/(^|[^가-힣])신\s?고\s?서([^가-힣]|$)/], titleOnly: true },
+];
+
+/* 문서종류 후보 목록 반환 : [{v, score, why}] */
+function detectDocTypes(lines, fileBase) {
+  const found = {};
+  function add(name, score, why) {
+    if (!found[name] || found[name].score < score) found[name] = { v: name, score: score, why: why };
+  }
+
+  DOC_TYPES.forEach(function (type) {
+    let best = 0;
+    let bestWhy = "";
+    lines.forEach(function (l) {
+      const hit = type.re.some(function (r) { return r.test(l.t); });
+      if (!hit) return;
+      let bonus = l.titleWeight;
+      // 줄 전체가 사실상 그 단어뿐이면 제목일 가능성이 매우 높음
+      if (l.t.replace(/\s/g, "").length <= type.n.length + 6) bonus += 15;
+      if (type.titleOnly && bonus < 55) return;
+      if (bonus > best) {
+        best = bonus;
+        bestWhy = (bonus >= 70 ? "제목 인식" : "본문 인식") + ' · "' + l.t.slice(0, 24) + '"';
+      }
+    });
+    if (best > 0) add(type.n, best + type.n.length, bestWhy);
+
+    // 원본 파일명에 이미 문서종류가 들어있으면 보조 근거로 사용
+    if (fileBase && type.re.some(function (r) { return r.test(fileBase); })) {
+      add(type.n, 52 + type.n.length, "원본 파일명");
+    }
+  });
+
+  // 사전에 없는 문서라도 제목이 '○○대장', '○○명세서'처럼 끝나면 그 말을 문서종류로 씀
+  TITLE_TAILS.forEach(function (tail) {
+    const re = new RegExp("([가-힣A-Za-z0-9]{1,14}" + tail + ")");
+    lines.forEach(function (l) {
+      if (l.titleWeight < 55) return;
+      const m = l.t.match(re);
+      if (!m) return;
+      const v = m[1].replace(/^\d+년?$|^\d+월?$/, "");
+      if (v.length >= 3) add(v, 46 + v.length, "제목에서 그대로 사용 · \"" + l.t.slice(0, 24) + '"');
+    });
+    if (fileBase) {
+      const m = fileBase.match(re);
+      if (m && m[1].length >= 3) add(m[1], 44 + m[1].length, "원본 파일명에서 그대로 사용");
+    }
+  });
+
+  return Object.keys(found).map(function (k) { return found[k]; })
+    .sort(function (a, b) { return b.score - a.score; });
+}
+
+// 한국 문서 이름이 흔히 끝나는 말들
+const TITLE_TAILS = [
+  "대장", "명세서", "명세표", "내역서", "정산서", "계산서", "신고서", "증명서", "확인서",
+  "명부", "보고서", "원장", "시산표", "의사록", "계약서", "영수증", "청구서", "지급조서",
+];
+
+/* =========================================================
+   3) 거래처명 인식
+   - 라벨(상호/법인명/거래처명…) 기준으로 값을 잘라내고 후보 점수화
+   - 세금계산서처럼 한 줄에 상호가 두 번 나오면 공급자/공급받는자로 구분
+========================================================= */
+const CORP_WORDS = ["주식회사", "유한회사", "유한책임회사", "합자회사", "합명회사"];
+
+/* ---------------------------------------------------------
+   사업자등록번호
+   - 상호는 표기가 제각각이고 OCR도 잘 틀리지만, 사업자번호는 변하지 않음
+   - 마지막 자리 검증식(체크섬)으로 잘못 읽힌 번호를 걸러냄
+--------------------------------------------------------- */
+const BIZNO_RE = /(?:^|[^0-9])(\d{3})\s*[-.\s]?\s*(\d{2})\s*[-.\s]?\s*(\d{5})(?![0-9])/g;
+
+function normalizeBizNo(s) { return String(s || "").replace(/\D/g, "").slice(0, 10); }
+function formatBizNo(d) {
+  const n = normalizeBizNo(d);
+  return n.length === 10 ? n.slice(0, 3) + "-" + n.slice(3, 5) + "-" + n.slice(5) : n;
+}
+
+// 국세청 사업자등록번호 검증식
+function isValidBizNo(d) {
+  const n = normalizeBizNo(d);
+  if (!/^\d{10}$/.test(n)) return false;
+  const w = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(n[i]) * w[i];
+  sum += Math.floor((Number(n[8]) * 5) / 10);
+  return ((10 - (sum % 10)) % 10) === Number(n[9]);
+}
+
+// 문서 전체에서 사업자등록번호를 모두 찾아냄 (등장 순서 유지)
+function detectBizNos(text) {
+  const out = [];
+  let m;
+  BIZNO_RE.lastIndex = 0;
+  while ((m = BIZNO_RE.exec(text)) !== null) {
+    const d = m[1] + m[2] + m[3];
+    if (!out.some(function (o) { return o.d === d; })) {
+      out.push({ d: d, idx: m.index, valid: isValidBizNo(d) });
+    }
+    if (m.index === BIZNO_RE.lastIndex) BIZNO_RE.lastIndex++;
+  }
+  return out;
+}
+
+// 목록 한 줄을 {이름, 사업자번호}로 분해. "미래물산, 210-81-12345" / "210-81-12345 미래물산" 모두 인식
+function parseClientLine(line) {
+  const s = String(line || "").trim();
+  if (!s) return null;
+  BIZNO_RE.lastIndex = 0;
+  const m = BIZNO_RE.exec(s);
+  let bizNo = "", name = s;
+  if (m) {
+    const hit = m[1] + m[2] + m[3];
+    bizNo = hit;
+    const start = m.index + m[0].length - m[0].replace(/^[^0-9]/, "").length;
+    name = (s.slice(0, start) + " " + s.slice(m.index + m[0].length)).trim();
+  }
+  name = name.replace(/[,\t]/g, " ").replace(/\s{2,}/g, " ").trim();
+  if (!name) return null;
+  return { name: name, bizNo: bizNo };
+}
+
+// 값 뒤에 다른 항목 라벨이 붙어 오는 경우를 잘라내기 위한 목록
+const CUT_WORDS = [
+  "사업자등록번호", "주민등록번호", "법인등록번호", "등록번호", "일련번호", "관리번호", "승인번호", "문서확인번호",
+  "종사업장", "사업장소재지", "사업장", "소재지", "주소", "업태", "종목", "성명", "대표자", "직위",
+  "전화번호", "휴대전화", "연락처", "팩스", "이메일", "우편번호",
+  "작성일자", "작성년월일", "발급일자", "공급가액", "세액", "합계금액", "비고", "품목", "규격", "수량", "단가",
+  "귀하", "귀중", "서명", "날인", "인감", "은행", "계좌",
+  "상호", "법인명", "회사명", "거래처명", "지분", "매도인", "매수인", "임대인", "임차인", "공유자", "계약금", "잔금"
+];
+
+const CLIENT_STOPWORDS = [
+  "국세청", "세무서", "홈택스", "정부24", "대법원", "등기소", "국민연금공단", "건강보험공단", "근로복지공단",
+  "합계", "소계", "총계", "미상", "해당없음", "없음", "귀하", "귀중", "성명", "상호", "대표자", "이름",
+  "회사", "회사는", "법인", "사업자", "대표", "담당자", "본인", "우리", "당사"
+];
+
+// 파일명에 흔히 붙는 꾸밈말 - 거래처 후보에서 제외
+const FILE_NOISE = [
+  "스캔", "사본", "원본", "최종", "수정", "완료", "첨부", "파일", "문서", "자료", "제출", "송부",
+  "확인", "검토", "보관", "신규", "기존", "작성", "발송", "요청", "전달", "복사본", "재발행",
+  // 서류 종류를 가리키는 말들 (거래처명이 아님)
+  "인건비", "노무비", "급여", "임금", "상여", "수당", "퇴직", "대장", "명세", "내역", "정산",
+  "신고", "증명", "계산서", "영수증", "견적", "계약", "세금", "부가세", "원천", "소득", "보험",
+  "연말정산", "장부", "결산", "재무", "매출", "매입",
+  "scan", "copy", "final", "new", "doc", "img", "image", "pdf"
+];
+
+// 서술문(문장)이 거래처명으로 잡히는 것을 막기 위한 패턴
+const SENTENCE_RE = /(한다|합니다|하였|이라|이며|하며|하고|되며|된다|또는|경우|위하여|같이|다음과|아래와)/;
+
+function cleanClientName(raw) {
+  if (!raw) return null;
+  let s = String(raw).split(/[\n\r]/)[0];
+  s = normalizeText(s);
+  // 값 뒤에 붙어온 다른 라벨 앞에서 자르기
+  for (const w of CUT_WORDS) {
+    const idx = s.indexOf(w);
+    if (idx > 0) s = s.slice(0, idx);
+    else if (idx === 0) s = s.slice(w.length);
+  }
+  s = s.replace(/["'“”‘’]/g, "");
+  s = s.replace(/[,，;；]/g, " ");
+  s = s.replace(/\([^)]*\)/g, "");
+  s = s.replace(/\[[^\]]*\]/g, "");
+  CORP_WORDS.forEach(function (w) { s = s.replace(new RegExp(w, "g"), ""); });
+  s = s.replace(/㈜|\(주\)|\(유\)/g, "");
+  s = s.replace(/(귀하|귀중|대표자?|사장|이사)\s*$/g, "");
+  s = s.replace(/^[\s:：.,·\-|)]+/, "").replace(/[\s:：.,·\-|(]+$/, "");
+  s = s.replace(/\s{2,}/g, " ").trim();
+
+  if (!s) return null;
+  if (s.length < 2 || s.length > 22) return null;
+  if (SENTENCE_RE.test(s)) return null;                 // 문장이 통째로 잡힌 경우
+  if ((s.match(/ /g) || []).length >= 2) return null;    // 단어 3개 이상이면 상호가 아님
+  if (/\d{2,3}-\d{2}-\d{5}/.test(s)) return null;      // 사업자등록번호
+  if (/\d{6}-\d{7}/.test(s)) return null;               // 주민등록번호
+  if (/^[\d\s.,\-/]+$/.test(s)) return null;            // 숫자/기호뿐
+  if (!/[가-힣A-Za-z]/.test(s)) return null;
+  if (CLIENT_STOPWORDS.indexOf(s) !== -1) return null;
+  if (DOC_TYPES.some(function (t) { return t.n === s; })) return null;
+  return s;
+}
+
+// 라벨 정의 : src 는 정규식 소스(문자열), s 는 기본 점수
+const CLIENT_LABELS = [
+  { src: "상\\s?호\\s?\\(?\\s?법인\\s?명\\s?\\)?", s: 92, why: "상호(법인명) 라벨" },
+  { src: "법\\s?인\\s?명\\s?\\(?\\s?단체명\\s?\\)?", s: 88, why: "법인명 라벨" },
+  { src: "상\\s?호\\s?및\\s?성\\s?명", s: 88, why: "상호 및 성명 라벨" },
+  { src: "상\\s?호", s: 85, why: "상호 라벨" },
+  { src: "법\\s?인\\s?명", s: 85, why: "법인명 라벨" },
+  { src: "회\\s?사\\s?명", s: 83, why: "회사명 라벨" },
+  { src: "거\\s?래\\s?처\\s?명?", s: 83, why: "거래처명 라벨" },
+  { src: "사\\s?업\\s?장\\s?명", s: 80, why: "사업장명 라벨" },
+  { src: "납\\s?세\\s?자\\s?(성명|명)?", s: 74, why: "납세자 라벨" },
+  { src: "신\\s?고\\s?인\\s?(성명)?", s: 70, why: "신고인 라벨" },
+  { src: "청\\s?구\\s?인", s: 66, why: "청구인 라벨" },
+  { src: "임\\s?차\\s?인", s: 68, why: "임차인 라벨" },
+  { src: "매\\s?수\\s?인", s: 68, why: "매수인 라벨" },
+  { src: "임\\s?대\\s?인", s: 64, why: "임대인 라벨" },
+  { src: "매\\s?도\\s?인", s: 64, why: "매도인 라벨" },
+  { src: "양\\s?수\\s?인", s: 64, why: "양수인 라벨" },
+  { src: "양\\s?도\\s?인", s: 64, why: "양도인 라벨" },
+  { src: "성\\s?명\\s?\\(?\\s?대표자\\s?\\)?", s: 56, why: "성명(대표자) 라벨" },
+  { src: "대\\s?표\\s?자\\s?(성명)?", s: 50, why: "대표자 라벨" },
+  { src: "성\\s?명", s: 46, why: "성명 라벨" },
+];
+
+/* 한 줄에서 특정 라벨 뒤에 오는 값들을 모두 뽑아냄.
+   라벨 앞이 한글/괄호면 무시 → '제1조(상호)' 같은 조문 제목이 라벨로 오인되지 않음 */
+function valuesAfterLabel(line, labelSrc) {
+  const re = new RegExp("(^|[\\s|,·\\-\\[/])" + labelSrc + "\\s*[:：]?\\s*", "g");
+  const res = [];
+  let m;
+  while ((m = re.exec(line)) !== null) {
+    res.push(line.slice(m.index + m[0].length));
+    if (m.index === re.lastIndex) re.lastIndex++;
+  }
+  return res;
+}
+
+// 정관·계약서의 조문 줄은 라벨 추출에서 제외
+function isArticleLine(t) {
+  return /^\s*제\s?\d+\s?[조장절관]/.test(t) || /^\s*[①-⑳]/.test(t);
+}
+
+/* 급여대장 같은 표의 '머리글 행'을 라벨 추출에서 제외.
+   표에서는 '성명' 옆 칸이 값이 아니라 또 다른 항목 이름이라서,
+   그대로 두면 "지급총액 공제계 실지급액" 같은 게 거래처명으로 잡힌다. */
+const TABLE_HEADER_WORDS = [
+  "성명", "이름", "주민등록번호", "주민번호", "생년월일", "사업자등록번호",
+  "지급액", "지급총액", "지급계", "실지급액", "공제", "공제계", "공제액", "차인지급액",
+  "소득세", "지방소득세", "주민세", "국민연금", "건강보험", "고용보험", "산재보험", "장기요양",
+  "급여", "상여", "수당", "일당", "단가", "근무일수", "근무시간", "기본급", "연장", "야간", "휴일",
+  "직급", "부서", "입사일", "퇴사일", "계좌번호", "예금주", "합계", "비고", "구분", "연번",
+];
+function isTableHeaderLine(t) {
+  let hit = 0;
+  for (const w of TABLE_HEADER_WORDS) {
+    if (t.indexOf(w) !== -1) hit++;
+    if (hit >= 3) return true;
+  }
+  return false;
+}
+
+function detectClients(lines, fileBase, savedList) {
+  const cands = {};
+  function add(name, score, why) {
+    if (!name) return;
+    if (!cands[name]) cands[name] = { v: name, score: score, why: why, hits: 1 };
+    else {
+      cands[name].hits++;
+      if (score > cands[name].score) { cands[name].score = score; cands[name].why = why; }
+    }
+  }
+
+  const text = linesToText(lines);
+  const flat = text.replace(/\s/g, "");
+
+  // (0) 사업자등록번호 대조 - 가장 확실한 근거
+  //     상호 표기가 다르거나 OCR이 상호를 못 읽어도 번호만 맞으면 거래처가 확정됨
+  const bizNos = detectBizNos(text);
+  if (savedList && savedList.length && bizNos.length) {
+    bizNos.forEach(function (b) {
+      savedList.forEach(function (e) {
+        if (!e || !e.bizNo || e.bizNo !== b.d) return;
+        const core = cleanClientName(e.name) || String(e.name).trim();
+        add(core, 200, "사업자등록번호 일치 (" + formatBizNo(b.d) + ")");
+      });
+    });
+  }
+
+  // (1) 저장된 거래처 목록의 상호 대조
+  // 목록에 '주식회사 미래물산'처럼 적혀 있어도 파일명에는 '미래물산'만 들어가도록 정리해서 씀
+  if (savedList && savedList.length) {
+    savedList.slice().sort(function (a, b) {
+      return String(b && b.name).length - String(a && a.name).length;
+    }).forEach(function (e) {
+      const name = e && e.name;
+      if (!name) return;
+      const core = cleanClientName(name) || String(name).trim();
+      const flatName = String(name).replace(/\s/g, "");
+      const flatCore = core.replace(/\s/g, "");
+      const hit = text.indexOf(name) !== -1 || flat.indexOf(flatName) !== -1 ||
+        (flatCore.length >= 2 && flat.indexOf(flatCore) !== -1);
+      if (hit) add(core, 130, "저장된 거래처 목록과 일치");
+      // 문서 안에 상호가 없어도 파일명에 있으면 인정 (인건비 엑셀처럼 표만 있는 자료)
+      else if (fileBase && (fileBase.indexOf(name) !== -1 ||
+        fileBase.replace(/\s/g, "").indexOf(flatCore) !== -1)) {
+        add(core, 118, "파일명이 저장된 거래처 목록과 일치");
+      }
+    });
+  }
+
+  // (2) 라벨 기반 추출
+  lines.forEach(function (l) {
+    if (isArticleLine(l.t) || isTableHeaderLine(l.t)) return;
+    CLIENT_LABELS.forEach(function (lb) {
+      const vals = valuesAfterLabel(l.t, lb.src);
+      vals.forEach(function (raw, idx) {
+        const c = cleanClientName(raw);
+        if (!c) return;
+        let sc = lb.s;
+        let why = lb.why;
+        // 같은 줄에 라벨이 2번 = 공급자 / 공급받는자 표
+        if (vals.length > 1) {
+          why = lb.why + (idx === 0 ? " (공급자쪽)" : " (공급받는자쪽)");
+          sc -= 4;
+        }
+        if (l.page === 1) sc += 4;
+        add(c, sc, why);
+      });
+      // 값이 다음 줄에 있는 세로형 서식 대응
+      if (new RegExp("^\\s*" + lb.src + "\\s*[:：]?\\s*$").test(l.t)) {
+        const next = lines[lines.indexOf(l) + 1];
+        if (next) {
+          const c = cleanClientName(next.t);
+          if (c) add(c, lb.s - 6, lb.why + " (아랫줄)");
+        }
+      }
+    });
+  });
+
+  // (3) 법인 표기 패턴
+  const corpAlt = CORP_WORDS.join("|");
+  const corpPatterns = [
+    // '횡성주택주식회사'처럼 붙여 쓴 경우만 인정 (띄어쓰면 앞 단어가 상호가 아닐 확률이 높음)
+    { re: new RegExp("(?:^|[^가-힣A-Za-z0-9])([가-힣A-Za-z0-9&·]{2,15})(?:" + corpAlt + ")", "g"), g: 1, why: "법인 표기(뒤에 주식회사)" },
+    { re: new RegExp("(?:" + corpAlt + ")\\s?([가-힣A-Za-z0-9&·]{2,15})", "g"), g: 1, why: "법인 표기(주식회사 뒤)" },
+    { re: /([가-힣A-Za-z0-9&·]{2,15})\s?(?:㈜|\(주\))/g, g: 1, why: "법인 표기(㈜)" },
+    { re: /(?:㈜|\(주\))\s?([가-힣A-Za-z0-9&·]{2,15})/g, g: 1, why: "법인 표기(㈜)" },
+  ];
+  corpPatterns.forEach(function (p) {
+    let m;
+    p.re.lastIndex = 0;
+    while ((m = p.re.exec(text)) !== null) {
+      const c = cleanClientName(m[p.g]);
+      if (c) add(c, 72, p.why);
+      if (m.index === p.re.lastIndex) p.re.lastIndex++;
+    }
+  });
+
+  // (4) 원본 파일명에서 얻은 힌트 (문서 안 근거보다 낮은 점수)
+  if (fileBase) {
+    fileNameClientHints(fileBase).forEach(function (h) { add(h, 44, "원본 파일명"); });
+  }
+
+  // 보정 : 여러 곳에서 반복 등장하면 신뢰도 상승
+  let list = Object.keys(cands).map(function (k) {
+    const c = cands[k];
+    if (c.hits > 1) c.score += Math.min(12, c.hits * 4);
+    return c;
+  });
+
+  list = mergeParticleVariants(list);
+  return list.sort(function (a, b) { return b.score - a.score; });
+}
+
+/* '횡성주택' 과 '횡성주택이라'처럼 조사만 붙은 중복 후보를 하나로 합침 */
+const PARTICLE_RE = /^(이라고|이라|라고|에서|으로|에게|까지|부터|이며|은|는|이|가|을|를|의|와|과|에|도|만)$/;
+function mergeParticleVariants(list) {
+  const byLen = list.slice().sort(function (a, b) { return a.v.length - b.v.length; });
+  const dropped = {};
+  byLen.forEach(function (shortC) {
+    byLen.forEach(function (longC) {
+      if (shortC === longC || dropped[longC.v]) return;
+      if (longC.v.length <= shortC.v.length) return;
+      if (longC.v.indexOf(shortC.v) !== 0) return;
+      const tail = longC.v.slice(shortC.v.length);
+      if (!PARTICLE_RE.test(tail)) return;
+      shortC.score = Math.max(shortC.score, longC.score) + 4;
+      dropped[longC.v] = true;
+    });
+  });
+  return list.filter(function (c) { return !dropped[c.v]; });
+}
+
+// 파일명에서 날짜/문서종류/숫자를 빼고 남은 토큰을 거래처 후보로
+function fileNameClientHints(base) {
+  let s = base;
+  s = s.replace(/(19|20)\d{2}\s?[.\-_/년]\s?\d{1,2}\s?[.\-_/월]\s?\d{1,2}\s?일?/g, " ");
+  s = s.replace(/\d{6,8}/g, " ");
+  DOC_TYPES.forEach(function (t) {
+    t.re.forEach(function (r) { s = s.replace(new RegExp(r.source, "g"), " "); });
+    s = s.replace(new RegExp(t.n, "g"), " ");
+  });
+  const tokens = s.split(/[_\-\s()\[\]{}.,]+/).filter(Boolean);
+  const out = [];
+  tokens.forEach(function (t) {
+    const low = t.toLowerCase();
+    if (FILE_NOISE.some(function (w) { return low === w || low.indexOf(w) !== -1; })) return;
+    const c = cleanClientName(t);
+    if (c && out.indexOf(c) === -1) out.push(c);
+  });
+  return out.slice(0, 3);
+}
+
+/* =========================================================
+   4) 날짜 인식 → YY.MM.DD
+   - 문맥 단어(작성일자/발급일…)의 모든 등장 위치를 검사
+   - 미래 날짜·비현실적 연도는 제외, 문맥이 없으면 "오늘 이전 중 가장 최근"
+========================================================= */
+const NOW = new Date();
+
+function toYMD(y, m, d) {
+  y = parseInt(y, 10); m = parseInt(m, 10); d = parseInt(d, 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  if (y < 100) y = y < 70 ? 2000 + y : 1900 + y;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  if (y < 1990 || y > NOW.getFullYear() + 1) return null;
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return { y: y, m: m, d: d, dt: dt, s: pad2(y % 100) + "." + pad2(m) + "." + pad2(d) };
+}
+
+const DATE_CONTEXTS = [
+  { w: ["작성일자", "작성년월일", "작성연월일", "작성일"], s: 96 },
+  { w: ["발급일자", "발행일자", "발급일", "발행일", "교부일자"], s: 92 },
+  { w: ["계약일자", "계약체결일", "계약일"], s: 90 },
+  { w: ["신고일자", "신고일", "접수일자", "접수일", "제출일"], s: 86 },
+  { w: ["결의일", "개최일", "의결일"], s: 84 },
+  { w: ["일자", "년월일", "연월일", "날짜"], s: 62 },
+  // 개업일·설립일은 '그 문서를 만든 날'이 아니어서 우선순위를 낮춤
+  { w: ["등기일", "등록일", "개업일", "개업연월일", "설립일", "취득일"], s: 38 },
+];
+
+// 계약기간·유효기간 안의 날짜는 문서 작성일이 아님
+const DATE_NEG_WORDS = ["기간", "부터", "까지", "만기", "만료", "종료", "개시", "유효", "이후", "이전"];
+
+// 일자 없이 '2025년 3월' / '2025.03'처럼 연·월만 적힌 경우 (뒤에 일자가 붙으면 제외)
+const YM_RE = /(19\d{2}|20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*(?:월|분)?(?![\s.\-/]*\d)/g;
+
+// 관인·직인 위에 찍히는 발급일자 (한국 공문서 관행)
+const ISSUER_RE = /(세무서장|국세청장|시장|군수|구청장|도지사|법원|등기소|공단|이사장|원장|위원장|대표이사|은행장|조합장|사장)/;
+
+const DATE_PATTERNS = [
+  { re: /(19\d{2}|20\d{2})\s?[.\-/년]\s?(\d{1,2})\s?[.\-/월]\s?(\d{1,2})\s?일?/g, base: 40, kind: "본문 날짜" },
+  { re: /(19\d{2}|20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/g, base: 32, kind: "8자리 날짜" },
+  { re: /(?:^|[^\d])(\d{2})\s?[.\-/]\s?(\d{1,2})\s?[.\-/]\s?(\d{1,2})(?!\d)/g, base: 26, kind: "짧은 날짜" },
+];
+
+function detectDates(lines, fileBase, meta, file, opts) {
+  const text = linesToText(lines);
+  const raw = [];
+
+  DATE_PATTERNS.forEach(function (p) {
+    let m;
+    p.re.lastIndex = 0;
+    while ((m = p.re.exec(text)) !== null) {
+      const ymd = toYMD(m[1], m[2], m[3]);
+      if (ymd) raw.push({ ymd: ymd, idx: m.index, len: m[0].length, base: p.base, kind: p.kind });
+      if (m.index === p.re.lastIndex) p.re.lastIndex++;
+    }
+  });
+
+  const found = {};
+  function add(ymd, score, why) {
+    const k = ymd.s;
+    if (!found[k] || found[k].score < score) found[k] = { v: k, score: score, why: why, dt: ymd.dt };
+    else found[k].hits = (found[k].hits || 1) + 1;
+  }
+
+  raw.forEach(function (r) {
+    let score = r.base;
+    let why = r.kind;
+    // 라벨은 날짜 '앞'에 오는 것이 원칙. 뒤쪽은 바로 붙은 짧은 범위만 본다.
+    const before = text.slice(Math.max(0, r.idx - 26), r.idx).replace(/\s/g, "");
+    const after = text.slice(r.idx + r.len, r.idx + r.len + 10).replace(/\s/g, "");
+    let matched = false;
+    for (const ctx of DATE_CONTEXTS) {
+      const hit = ctx.w.find(function (w) {
+        return before.indexOf(w) !== -1 || after.indexOf(w) !== -1;
+      });
+      if (hit) { score = ctx.s; why = hit; matched = true; break; }
+    }
+    // 라벨이 없고 '기간/부터/까지' 같은 말에 둘러싸여 있으면 작성일이 아님
+    if (!matched) {
+      const near = before.slice(-8) + after;
+      if (DATE_NEG_WORDS.some(function (w) { return near.indexOf(w) !== -1; })) score -= 25;
+    }
+    // 미래 날짜는 계약 종료일 등일 가능성이 커서 감점
+    if (r.ymd.dt > NOW) score -= 30;
+    add(r.ymd, score, why);
+  });
+
+  // 줄 단위 보정 : '○○세무서장' 같은 발급기관 바로 위/같은 줄의 날짜는 발급일
+  lines.forEach(function (l, i) {
+    const nxt = lines[i + 1] ? lines[i + 1].t : "";
+    if (!ISSUER_RE.test(l.t) && !ISSUER_RE.test(nxt)) return;
+    DATE_PATTERNS.forEach(function (p) {
+      let m;
+      p.re.lastIndex = 0;
+      while ((m = p.re.exec(l.t)) !== null) {
+        const ymd = toYMD(m[1], m[2], m[3]);
+        if (ymd && ymd.dt <= NOW) add(ymd, 88, "발급기관 표시 위 날짜");
+        if (m.index === p.re.lastIndex) p.re.lastIndex++;
+      }
+    });
+  });
+
+  // 문맥이 전혀 없을 때를 대비한 보조 근거들
+  if (opts && opts.useFileName && fileBase) {
+    DATE_PATTERNS.forEach(function (p) {
+      let m;
+      p.re.lastIndex = 0;
+      while ((m = p.re.exec(fileBase)) !== null) {
+        const ymd = toYMD(m[1], m[2], m[3]);
+        if (ymd) add(ymd, 78, "원본 파일명");
+        if (m.index === p.re.lastIndex) p.re.lastIndex++;
+      }
+    });
+  }
+  if (meta && meta.created) {
+    const ymd = toYMD(meta.created.y, meta.created.m, meta.created.d);
+    if (ymd) add(ymd, 34, "PDF 작성정보");
+  }
+  /* 파일 수정일은 마지막 수단.
+     메일·홈택스에서 내려받은 파일은 수정일이 '내려받은 날'이라 엉뚱한 날짜가 되므로,
+     최근 사흘 이내로 찍힌 수정일은 신뢰하지 않는다. */
+  if (opts && opts.useFileDate && file && file.lastModified) {
+    const d = new Date(file.lastModified);
+    const daysAgo = (NOW - d) / 86400000;
+    if (daysAgo > 3) {
+      const ymd = toYMD(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      if (ymd) add(ymd, 12, "파일 수정일(추정)");
+    }
+  }
+
+  /* 급여대장처럼 '2025년 3월'만 있고 일자가 없는 자료 대응.
+     제대로 된 날짜를 하나도 못 찾았을 때만 연·월을 쓴다 (파일 수정일보다 훨씬 정확) */
+  const hasStrong = Object.keys(found).some(function (k) { return found[k].score >= 40; });
+  if (!hasStrong) {
+    const ymSources = [{ s: text, w: 48, why: "연·월만 확인됨" }];
+    if (opts && opts.useFileName && fileBase) ymSources.push({ s: fileBase, w: 52, why: "원본 파일명의 연·월" });
+    ymSources.forEach(function (src) {
+      let m;
+      YM_RE.lastIndex = 0;
+      while ((m = YM_RE.exec(src.s)) !== null) {
+        const y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+        if (mo < 1 || mo > 12 || y < 1990 || y > NOW.getFullYear() + 1) continue;
+        const key = pad2(y % 100) + "." + pad2(mo);
+        if (!found[key] || found[key].score < src.w) {
+          found[key] = { v: key, score: src.w, why: src.why, dt: new Date(y, mo - 1, 1) };
+        }
+        if (m.index === YM_RE.lastIndex) YM_RE.lastIndex++;
+      }
+    });
+  }
+
+  const list = Object.keys(found).map(function (k) { return found[k]; });
+  // 동점이면 오늘 이전 중 가장 최근 날짜를 우선
+  list.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    const af = a.dt > NOW, bf = b.dt > NOW;
+    if (af !== bf) return af ? 1 : -1;
+    return b.dt - a.dt;
+  });
+  return list;
+}
+
+/* =========================================================
+   5) 종합 분석
+========================================================= */
+function confidenceOf(score) {
+  if (score >= 80) return "high";
+  if (score >= 50) return "mid";
+  if (score > 0) return "low";
+  return "none";
+}
+
+function analyzeDoc(item, doc, opts) {
+  const base = item.file.name.replace(/\.[^.]+$/, "");
+  const lines = markTitleWeight((doc.lines || []).slice());
+  // PDF 제목 메타데이터도 한 줄로 취급해 제목 인식에 포함
+  if (doc.meta && doc.meta.title && doc.meta.title.length > 1) {
+    lines.push({ t: normalizeText(doc.meta.title), size: 0, page: 1, order: -1, titleWeight: 75 });
+  }
+
+  const typeCands = detectDocTypes(lines, opts.useFileName ? base : "");
+  const clientCands = detectClients(lines, opts.useFileName ? base : "", clientList);
+  const dateCands = detectDates(lines, base, doc.meta, item.file, opts);
+
+  item.lines = lines;
+  item.extractedText = linesToText(lines);
+  item.bizNos = detectBizNos(item.extractedText);
+  item.cands = { docType: typeCands, client: clientCands, date: dateCands };
+  item.docType = typeCands.length ? typeCands[0].v : null;
+  item.client = clientCands.length ? clientCands[0].v : null;
+  item.date = dateCands.length ? dateCands[0].v : null;
+  item.src = {
+    docType: typeCands.length ? typeCands[0] : null,
+    client: clientCands.length ? clientCands[0] : null,
+    date: dateCands.length ? dateCands[0] : null,
+  };
+  item.titleLine = lines.filter(function (l) { return l.page === 1 && l.titleWeight >= 70; })
+    .slice(0, 2).map(function (l) { return l.t; }).join(" / ");
+  return item;
+}
+
+/* =========================================================
+   6) 파일형식 변환 (기존 기능 유지)
+========================================================= */
+function formatOptionsFor(ext) {
+  if (ext === "pdf") return [["", "원본 유지"], ["png", "PNG변환"], ["jpg", "JPG변환"], ["webp", "WEBP변환"], ["txt", "TXT변환"]];
+  if (IMG_EXTS.includes(ext)) return [["", "원본 유지"], ["jpg", "JPG변환"], ["png", "PNG변환"], ["webp", "WEBP변환"], ["pdf", "PDF변환"]];
+  if (["xlsx", "xls"].includes(ext)) return [["", "원본 유지"], ["csv", "CSV변환"]];
+  if (ext === "csv") return [["", "원본 유지"], ["xlsx", "XLSX변환"]];
+  if (ext === "docx") return [["", "원본 유지"], ["pdf", "PDF변환"], ["txt", "TXT변환"]];
+  return [["", "변환 미지원"]];
+}
+
+async function convertImageFormat(file, targetExt) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (targetExt === "jpg" || targetExt === "jpeg") {
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.drawImage(bitmap, 0, 0);
+  const mime = targetExt === "png" ? "image/png" : targetExt === "webp" ? "image/webp" : "image/jpeg";
+  return await new Promise(function (res) { canvas.toBlob(res, mime, 0.92); });
+}
+
+async function convertImageToPDF(file) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d").drawImage(bitmap, 0, 0);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  const jsPDF = window.jspdf.jsPDF;
+  const orientation = bitmap.width > bitmap.height ? "l" : "p";
+  const pdf = new jsPDF({ orientation: orientation, unit: "px", format: [bitmap.width, bitmap.height] });
+  pdf.addImage(dataUrl, "JPEG", 0, 0, bitmap.width, bitmap.height);
+  return pdf.output("blob");
+}
+
+async function convertPdfToImages(file, targetExt) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const blobs = [];
+  const mime = targetExt === "png" ? "image/png" : targetExt === "webp" ? "image/webp" : "image/jpeg";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+    blobs.push(await new Promise(function (res) { canvas.toBlob(res, mime, 0.92); }));
+  }
+  return blobs;
+}
+
+async function convertPdfToText(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += linesToText(pdfItemsToLines(content.items, i)) + "\n";
+  }
+  return new Blob([text], { type: "text/plain;charset=utf-8;" });
+}
+
+async function convertExcelToCsv(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+  return new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+}
+
+async function convertCsvToExcel(file) {
+  const text = await file.text();
+  const wb = XLSX.read(text, { type: "string" });
+  const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+async function convertDocxToTxt(file) {
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: buf });
+  return new Blob([result.value], { type: "text/plain;charset=utf-8;" });
+}
+
+async function convertDocxToPdf(file) {
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+  const container = document.createElement("div");
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;font-family:"맑은 고딕","Malgun Gothic",sans-serif;padding:24px;width:700px;background:#fff;color:#222;';
+  container.innerHTML = result.value;
+  document.body.appendChild(container);
+  try {
+    const opt = {
+      margin: 10,
+      image: { type: "jpeg", quality: 0.95 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+    };
+    const pdfObj = await html2pdf().set(opt).from(container).toPdf().get("pdf");
+    return pdfObj.output("blob");
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+async function getConversionOutputs(item) {
+  const ext = getExt(item.file.name);
+  const target = item.targetFormat;
+  if (!target) {
+    const buf = await item.file.arrayBuffer();
+    return [{ blob: new Blob([buf], { type: item.file.type || "application/octet-stream" }), ext: ext }];
+  }
+  try {
+    if (IMG_EXTS.includes(ext) && ["jpg", "jpeg", "png", "webp"].includes(target)) {
+      return [{ blob: await convertImageFormat(item.file, target), ext: target }];
+    }
+    if (IMG_EXTS.includes(ext) && target === "pdf") {
+      return [{ blob: await convertImageToPDF(item.file), ext: "pdf" }];
+    }
+    if (ext === "pdf" && ["png", "jpg", "webp"].includes(target)) {
+      const blobs = await convertPdfToImages(item.file, target);
+      return blobs.map(function (b) { return { blob: b, ext: target }; });
+    }
+    if (ext === "pdf" && target === "txt") return [{ blob: await convertPdfToText(item.file), ext: "txt" }];
+    if (["xlsx", "xls"].includes(ext) && target === "csv") return [{ blob: await convertExcelToCsv(item.file), ext: "csv" }];
+    if (ext === "csv" && target === "xlsx") return [{ blob: await convertCsvToExcel(item.file), ext: "xlsx" }];
+    if (ext === "docx" && target === "pdf") return [{ blob: await convertDocxToPdf(item.file), ext: "pdf" }];
+    if (ext === "docx" && target === "txt") return [{ blob: await convertDocxToTxt(item.file), ext: "txt" }];
+  } catch (e) {
+    console.error("변환 오류", e);
+    alert('"' + item.file.name + '" 변환 중 문제가 생겨서 원본 형식으로 다운로드할게요.');
+  }
+  const buf = await item.file.arrayBuffer();
+  return [{ blob: new Blob([buf], { type: item.file.type || "application/octet-stream" }), ext: ext }];
+}
+
+/* =========================================================
+   7) 화면 구성
+========================================================= */
+const state = [];
+let seq = 0;
+
+const fileListEl = document.getElementById("fileList");
+const countBadge = document.getElementById("countBadge");
+const emptyHint = document.getElementById("emptyHint");
+const bulkBar = document.getElementById("bulkBar");
+
+function iconClass(ext) {
+  if (ext === "pdf") return "pdf";
+  if (IMG_EXTS.includes(ext)) return "img";
+  if (["xlsx", "xls", "csv"].includes(ext)) return "xlsx";
+  if (["docx", "doc"].includes(ext)) return "doc";
+  return "other";
+}
+function iconLabel(ext) {
+  if (ext === "pdf") return "PDF";
+  if (IMG_EXTS.includes(ext)) return "IMG";
+  if (["xlsx", "xls", "csv"].includes(ext)) return "XLS";
+  if (["docx", "doc"].includes(ext)) return "DOC";
+  if (ext === "txt") return "TXT";
+  if (ext === "hwp" || ext === "hwpx") return "HWP";
+  return ext ? ext.slice(0, 3).toUpperCase() : "?";
+}
+
+/* =========================================================
+   파일 미리보기
+   - 카드에는 작은 썸네일, 누르면 크게 보기
+   - PDF는 페이지를 넘겨가며 볼 수 있고, 표/문서 파일은 읽어낸 내용을 보여줌
+========================================================= */
+async function renderPdfPage(pdfDoc, pageNo, targetWidth) {
+  const page = await pdfDoc.getPage(pageNo);
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.max(0.1, targetWidth / base.width);
+  const viewport = page.getViewport({ scale: scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+  return canvas;
+}
+
+// 분석이 끝난 뒤 카드에 넣을 작은 썸네일을 만든다 (실패해도 무시)
+async function makeThumb(item, doc) {
+  const ext = getExt(item.file.name);
+  try {
+    if (IMG_EXTS.includes(ext)) {
+      item.thumbUrl = URL.createObjectURL(item.file);
+      return;
+    }
+    if (ext === "pdf") {
+      let pdfDoc = doc && doc.pdfDoc;
+      if (!pdfDoc) pdfDoc = await pdfjsLib.getDocument({ data: await item.file.arrayBuffer() }).promise;
+      item._pvPdf = pdfDoc; // 미리보기에서 다시 열지 않고 그대로 재사용
+      const canvas = await renderPdfPage(pdfDoc, 1, 160);
+      item.thumbUrl = canvas.toDataURL("image/jpeg", 0.7);
+    }
+  } catch (e) { /* 썸네일은 없어도 되는 정보 */ }
+}
+
+function releaseItem(item) {
+  if (item.thumbUrl && item.thumbUrl.indexOf("blob:") === 0) URL.revokeObjectURL(item.thumbUrl);
+  item.thumbUrl = null;
+  if (item._pvPdf && typeof item._pvPdf.destroy === "function") {
+    try { item._pvPdf.destroy(); } catch (e) {}
+  }
+  item._pvPdf = null;
+}
+
+const pvBackdrop = document.getElementById("pvBackdrop");
+const pvTitle = document.getElementById("pvTitle");
+const pvNav = document.getElementById("pvNav");
+const pvBody = document.getElementById("pvBody");
+let pv = { item: null, pdf: null, page: 1, pages: 1 };
+
+function closePreview() {
+  pvBackdrop.hidden = true;
+  pvBody.innerHTML = "";
+  pvNav.innerHTML = "";
+  pv = { item: null, pdf: null, page: 1, pages: 1 };
+  document.removeEventListener("keydown", pvKeydown);
+}
+
+function pvKeydown(e) {
+  if (e.key === "Escape") { closePreview(); return; }
+  if (!pv.pdf) return;
+  if (e.key === "ArrowRight" || e.key === "PageDown") showPdfPage(pv.page + 1);
+  if (e.key === "ArrowLeft" || e.key === "PageUp") showPdfPage(pv.page - 1);
+}
+
+function paintPvNav() {
+  if (!pv.pdf || pv.pages <= 1) { pvNav.innerHTML = ""; return; }
+  pvNav.innerHTML =
+    '<button type="button" id="pvPrev"' + (pv.page <= 1 ? " disabled" : "") + ">◀</button>" +
+    "<span>" + pv.page + " / " + pv.pages + "</span>" +
+    '<button type="button" id="pvNext"' + (pv.page >= pv.pages ? " disabled" : "") + ">▶</button>";
+  const p = document.getElementById("pvPrev");
+  const n = document.getElementById("pvNext");
+  if (p) p.addEventListener("click", function () { showPdfPage(pv.page - 1); });
+  if (n) n.addEventListener("click", function () { showPdfPage(pv.page + 1); });
+}
+
+async function showPdfPage(no) {
+  if (!pv.pdf) return;
+  const target = Math.min(Math.max(1, no), pv.pages);
+  if (target === pv.page && pvBody.querySelector("canvas")) return;
+  pv.page = target;
+  paintPvNav();
+  try {
+    const width = Math.min(900, Math.max(320, pvBody.clientWidth - 32));
+    const canvas = await renderPdfPage(pv.pdf, pv.page, width);
+    pvBody.innerHTML = "";
+    pvBody.appendChild(canvas);
+  } catch (e) {
+    pvBody.innerHTML = '<div class="pv-msg">이 페이지를 그리지 못했어요.</div>';
+  }
+}
+
+async function openPreview(item) {
+  pv = { item: item, pdf: null, page: 1, pages: 1 };
+  pvTitle.textContent = item.file.name;
+  pvNav.innerHTML = "";
+  pvBody.innerHTML = '<div class="pv-msg">불러오는 중...</div>';
+  pvBackdrop.hidden = false;
+  document.addEventListener("keydown", pvKeydown);
+
+  const ext = getExt(item.file.name);
+  try {
+    if (IMG_EXTS.includes(ext)) {
+      const img = document.createElement("img");
+      img.src = item.thumbUrl && item.thumbUrl.indexOf("blob:") === 0
+        ? item.thumbUrl : URL.createObjectURL(item.file);
+      img.alt = item.file.name;
+      pvBody.innerHTML = "";
+      pvBody.appendChild(img);
+      return;
+    }
+    if (ext === "pdf") {
+      if (!item._pvPdf) {
+        item._pvPdf = await pdfjsLib.getDocument({ data: await item.file.arrayBuffer() }).promise;
+      }
+      pv.pdf = item._pvPdf;
+      pv.pages = pv.pdf.numPages;
+      pv.page = 0;
+      await showPdfPage(1);
+      return;
+    }
+    // 표·문서·텍스트 파일은 읽어낸 내용을 보여줌
+    const text = (item.extractedText || "").trim();
+    if (text) {
+      const pre = document.createElement("pre");
+      pre.textContent = text.slice(0, 20000);
+      pvBody.innerHTML = "";
+      pvBody.appendChild(pre);
+    } else {
+      pvBody.innerHTML = '<div class="pv-msg">이 형식은 화면으로 보여줄 수 없어요. 원본 프로그램에서 열어주세요.</div>';
+    }
+  } catch (e) {
+    pvBody.innerHTML = '<div class="pv-msg">미리보기를 불러오지 못했어요: ' + esc(e && e.message ? e.message : e) + "</div>";
+  }
+}
+
+document.getElementById("pvClose").addEventListener("click", closePreview);
+pvBackdrop.addEventListener("click", function (e) {
+  if (e.target === pvBackdrop) closePreview();
+});
+
+function buildBaseName(item) {
+  const type = sanitize(item.docType) || "미확인문서";
+  const client = sanitize(item.client) || "미확인거래처";
+  const date = sanitize(item.date) || "미확인날짜";
+  return type + "_" + client + "_" + date;
+}
+function previewName(item) {
+  const ext = item.targetFormat || getExt(item.file.name);
+  return buildBaseName(item) + (ext ? "." + ext : "");
+}
+
+/* 새 파일명을 조각으로 나눠 표시.
+   못 찾은 항목은 '문서종류 입력' 버튼으로 보여주고, 누르면 그 칸으로 바로 이동 */
+const NAME_FIELDS = [
+  { f: "docType", ph: "＋ 문서종류" },
+  { f: "client", ph: "＋ 거래처명" },
+  { f: "date", ph: "＋ 날짜" },
+];
+function nameHTML(item) {
+  const ext = item.targetFormat || getExt(item.file.name);
+  const segs = NAME_FIELDS.map(function (n) {
+    const v = sanitize(item[n.f]);
+    if (v) return '<span class="np" data-goto="' + n.f + '" title="' + esc(v) + '">' + esc(v) + "</span>";
+    return '<button type="button" class="np-miss" data-goto="' + n.f + '">' + n.ph + "</button>";
+  });
+  return segs[0] + '<span class="np-sep">_</span>' + segs[1] + '<span class="np-sep">_</span>' + segs[2] +
+    '<span class="np-ext">' + (ext ? "." + ext : "") + "</span>";
+}
+
+// 파일명 조각을 다시 그리고 클릭 동작을 연결
+function paintNameRow(item) {
+  const holder = item.el ? item.el.querySelector(".preview-row .name") : null;
+  if (!holder) return;
+  holder.innerHTML = nameHTML(item);
+  holder.title = previewName(item);
+  holder.querySelectorAll("[data-goto]").forEach(function (b) {
+    b.addEventListener("click", function (e) {
+      const f = e.currentTarget.dataset.goto;
+      if (!item.expanded) { item.expanded = true; refreshCard(item); }
+      const inp = item.el.querySelector('[data-field="' + f + '"]');
+      if (inp) { inp.focus(); inp.select(); }
+    });
+  });
+}
+
+function srcTag(item, field) {
+  const s = item.src ? item.src[field] : null;
+  if (item.edited && item.edited[field]) return '<span class="src-tag high">직접 입력</span>';
+  if (!s || !item[field]) return '<span class="src-tag none">못 찾음</span>';
+  const lv = confidenceOf(s.score);
+  return '<span class="src-tag ' + lv + '">' + esc(s.why) + "</span>";
+}
+
+function chipsHTML(item, field) {
+  const list = (item.cands && item.cands[field]) ? item.cands[field] : [];
+  const others = list.filter(function (c) { return c.v !== item[field]; }).slice(0, 4);
+  if (!others.length) return "";
+  return '<div class="cands"><span class="cands-label">다른 후보</span>' +
+    others.map(function (c) {
+      return '<button type="button" class="chip" data-field="' + field + '" data-val="' + esc(c.v) + '">' +
+        esc(c.v) + '<span class="chip-why">' + esc(c.why) + "</span></button>";
+    }).join("") + "</div>";
+}
+
+/* 문서에서 찾은 사업자등록번호 표시 + 목록에 없으면 한 번에 기억시키기 */
+function bizNoHTML(item) {
+  const list = item.bizNos || [];
+  if (!list.length) return "";
+  const known = {};
+  clientList.forEach(function (e) { if (e.bizNo) known[e.bizNo] = e.name; });
+
+  const parts = list.map(function (b) {
+    if (known[b.d]) return formatBizNo(b.d) + " → " + esc(known[b.d]);
+    return formatBizNo(b.d) + (b.valid ? " (목록에 없음)" : " (번호가 잘못 읽힌 듯)");
+  });
+  let html = '<span class="ev-line">· 문서에서 찾은 사업자등록번호 : ' + parts.join("  /  ") + "</span>";
+
+  const cur = sanitize(item.client);
+  const unknown = list.filter(function (b) { return b.valid && !known[b.d]; });
+  if (cur && unknown.length) {
+    html += '<div class="ev-learn">' + unknown.map(function (b) {
+      return '<button type="button" class="chip learn-chip" data-biz="' + b.d + '">' +
+        formatBizNo(b.d) + "를 &lsquo;" + esc(cur) + "&rsquo;로 기억하기</button>";
+    }).join("") + "</div>";
+  }
+  return html;
+}
+
+function overallLevel(item) {
+  if (!item.docType || !item.client || !item.date) return "warn";
+  const s = item.src || {};
+  const low = ["docType", "client", "date"].some(function (f) {
+    return !s[f] || confidenceOf(s[f].score) === "low";
+  });
+  return low ? "review" : "ok";
+}
+
+function cardHTML(item) {
+  const ext = getExt(item.file.name);
+  const fmtOptions = formatOptionsFor(ext);
+  const lvl = item.status === "busy" ? "busy" : overallLevel(item);
+  const badgeText = { busy: "분석 중", ok: "자동 인식 완료", review: "인식됨 · 확인 권장", warn: "일부 미확인" }[lvl];
+  const isMultiPageRisk = ext === "pdf" && ["png", "jpg", "webp"].includes(item.targetFormat);
+  const pv = previewName(item);
+
+  return '' +
+    '<div class="row1">' +
+      '<input type="checkbox" class="pick-box" data-act="pick"' + (item.picked ? " checked" : "") + ' title="여러 파일 한 번에 지정할 때 선택">' +
+      '<button type="button" class="file-thumb ' + iconClass(ext) + (item.thumbUrl ? " has-img" : "") +
+        '" data-act="preview" title="미리보기로 크게 보기">' +
+        (item.thumbUrl
+          ? '<img src="' + esc(item.thumbUrl) + '" alt="">'
+          : '<span class="tlabel">' + iconLabel(ext) + "</span>") +
+        '<span class="tzoom">🔍</span>' +
+      "</button>" +
+      '<div class="file-meta">' +
+        '<div class="orig-name" title="' + esc(item.file.name) + '">' + esc(item.file.name) + "</div>" +
+        '<div class="status-line"><span class="badge ' + lvl + '">' + badgeText + "</span>" +
+          '<span class="method-tag">' + esc(item.method || "") + (item.statusMsg ? " · " + esc(item.statusMsg) : "") + "</span></div>" +
+      "</div>" +
+      '<button class="edit-toggle" data-act="toggle">' + (item.expanded ? "접기" : "수정") + "</button>" +
+      '<button class="remove-btn" data-act="remove">삭제</button>' +
+    "</div>" +
+    '<div class="preview-row">' +
+      '<span class="label">새 파일명</span>' +
+      '<span class="name" title="' + esc(pv) + '">' + nameHTML(item) + "</span>" +
+      '<select class="fmt-select" data-act="fmt" ' + (fmtOptions.length === 1 ? "disabled" : "") + ">" +
+        fmtOptions.map(function (o) {
+          return '<option value="' + o[0] + '"' + (item.targetFormat === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
+        }).join("") +
+      "</select>" +
+      '<button class="dl" data-act="dl">다운로드</button>' +
+      (isMultiPageRisk ? '<span class="fmt-note">페이지가 여러 장이면 ZIP으로 묶어 다운로드돼요</span>' : "") +
+    "</div>" +
+    '<div class="fields' + (item.expanded ? "" : " fields-hidden") + '">' +
+      '<div class="field"><label>문서종류' + srcTag(item, "docType") + "</label>" +
+        '<input type="text" class="' + (item.docType ? "" : "miss") + '" data-field="docType" value="' + esc(item.docType || "") + '" placeholder="예: 정관"></div>' +
+      '<div class="field"><label>거래처명' + srcTag(item, "client") + "</label>" +
+        '<input type="text" class="' + (item.client ? "" : "miss") + '" data-field="client" value="' + esc(item.client || "") + '" placeholder="예: 홍길동"></div>' +
+      '<div class="field"><label>날짜 (YY.MM.DD)' + srcTag(item, "date") + "</label>" +
+        '<input type="text" class="' + (item.date ? "" : "miss") + '" data-field="date" value="' + esc(item.date || "") + '" placeholder="예: 25.03.14"></div>' +
+      chipsHTML(item, "docType") +
+      chipsHTML(item, "client") +
+      chipsHTML(item, "date") +
+      '<div class="evidence">' +
+        "<b>인식 근거</b>" +
+        '<span class="ev-line">· 제목으로 판단한 줄 : ' + esc(item.titleLine || "(찾지 못함)") + "</span>" +
+        '<span class="ev-line">· 추출 방식 : ' + esc(item.method || "-") + "</span>" +
+        bizNoHTML(item) +
+        "<details><summary>문서에서 읽은 텍스트 보기</summary>" +
+          '<textarea class="debug-text" readonly rows="6">' + esc((item.extractedText || "(추출된 텍스트가 없어요)").slice(0, 3000)) + "</textarea>" +
+        "</details>" +
+      "</div>" +
+    "</div>";
+}
+
+function bindCard(item) {
+  const el = item.el;
+  el.querySelectorAll("input[data-field]").forEach(function (inp) {
+    inp.addEventListener("input", function (e) {
+      const f = e.target.dataset.field;
+      item[f] = e.target.value;
+      item.edited = item.edited || {};
+      item.edited[f] = true;
+      e.target.classList.toggle("miss", !e.target.value.trim());
+      paintNameRow(item);
+      const badge = el.querySelector(".badge");
+      const lvl = overallLevel(item);
+      badge.className = "badge " + lvl;
+      badge.textContent = { ok: "자동 인식 완료", review: "인식됨 · 확인 권장", warn: "일부 미확인" }[lvl];
+    });
+  });
+  // 사업자번호를 현재 거래처명과 함께 목록에 저장 (다음부터 자동 확정)
+  el.querySelectorAll(".learn-chip").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      const biz = e.currentTarget.dataset.biz;
+      const name = sanitize(item.client);
+      if (!biz || !name) return;
+      const merged = clientList.slice();
+      const found = merged.find(function (x) { return x.name === name; });
+      if (found) found.bizNo = biz;
+      else merged.push({ name: name, bizNo: biz });
+      saveClientEntries(merged);
+      setSheetStatus(formatBizNo(biz) + " 를 '" + name + "' 로 기억했어요. 다음부터는 이 번호만 보고 거래처를 확정합니다.", "ok");
+      state.forEach(function (it) { if (it.el) refreshCard(it); });
+    });
+  });
+
+  el.querySelectorAll(".chip[data-field]").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      const f = e.currentTarget.dataset.field;
+      item[f] = e.currentTarget.dataset.val;
+      item.edited = item.edited || {};
+      item.edited[f] = true;
+      refreshCard(item);
+    });
+  });
+  const fmt = el.querySelector('[data-act="fmt"]');
+  if (fmt) fmt.addEventListener("change", function (e) { item.targetFormat = e.target.value; refreshCard(item); });
+  const tg = el.querySelector('[data-act="toggle"]');
+  if (tg) tg.addEventListener("click", function () { item.expanded = !item.expanded; refreshCard(item); });
+  const pick = el.querySelector('[data-act="pick"]');
+  if (pick) pick.addEventListener("change", function (e) {
+    item.picked = e.target.checked;
+    paintBulkEdit();
+  });
+  const pvBtn = el.querySelector('[data-act="preview"]');
+  if (pvBtn) pvBtn.addEventListener("click", function () { openPreview(item); });
+  const rm = el.querySelector('[data-act="remove"]');
+  if (rm) rm.addEventListener("click", function () {
+    const i = state.indexOf(item);
+    if (i !== -1) state.splice(i, 1);
+    if (pv.item === item) closePreview();
+    releaseItem(item);
+    if (item.el && item.el.parentNode) item.el.parentNode.removeChild(item.el);
+    updateChrome();
+  });
+  const dl = el.querySelector('[data-act="dl"]');
+  if (dl) dl.addEventListener("click", async function (e) {
+    const b = e.currentTarget;
+    const original = b.textContent;
+    b.disabled = true;
+    b.textContent = "처리 중...";
+    try { await downloadSingle(item); } finally { b.disabled = false; b.textContent = original; }
+  });
+  paintNameRow(item);
+}
+
+function mountCard(item) {
+  const el = document.createElement("div");
+  el.className = "file-card";
+  item.el = el;
+  el.innerHTML = cardHTML(item);
+  fileListEl.appendChild(el);
+  bindCard(item);
+  updateChrome();
+}
+
+// 카드 하나만 다시 그림 (분석이 끝나도 다른 카드에서 입력 중인 내용/커서가 사라지지 않음)
+function refreshCard(item) {
+  if (!item.el) return;
+  const active = document.activeElement;
+  const inThis = active && item.el.contains(active) ? active : null;
+  const keepField = inThis ? inThis.dataset.field : null;
+  const keepPos = inThis && inThis.selectionStart != null ? inThis.selectionStart : null;
+  item.el.innerHTML = cardHTML(item);
+  bindCard(item);
+  if (keepField) {
+    const n = item.el.querySelector('[data-field="' + keepField + '"]');
+    if (n) {
+      n.focus();
+      if (keepPos != null) { try { n.setSelectionRange(keepPos, keepPos); } catch (e) {} }
+    }
+  }
+}
+
+function updateChrome() {
+  countBadge.textContent = state.length;
+  emptyHint.style.display = state.length ? "none" : "block";
+  bulkBar.style.display = state.length ? "flex" : "none";
+  document.getElementById("bulkEdit").style.display = state.length ? "block" : "none";
+  paintBulkEdit();
+}
+
+/* ---- 여러 파일 한 번에 지정 ---- */
+const beAll = document.getElementById("beAll");
+const beCount = document.getElementById("beCount");
+const beBody = document.querySelector(".be-body");
+const beApply = document.getElementById("beApply");
+
+function pickedItems() {
+  return state.filter(function (i) { return i.picked; });
+}
+function paintBulkEdit() {
+  const n = pickedItems().length;
+  beCount.textContent = n ? n + "개 선택됨" : "파일을 선택하면 거래처·문서종류·날짜를 한 번에 지정할 수 있어요";
+  beBody.classList.toggle("hidden", n === 0);
+  beApply.disabled = n === 0;
+  beAll.checked = state.length > 0 && n === state.length;
+  beAll.indeterminate = n > 0 && n < state.length;
+}
+
+beAll.addEventListener("change", function (e) {
+  state.forEach(function (i) {
+    i.picked = e.target.checked;
+    const box = i.el && i.el.querySelector('[data-act="pick"]');
+    if (box) box.checked = e.target.checked;
+  });
+  paintBulkEdit();
+});
+
+beApply.addEventListener("click", function () {
+  const targets = pickedItems();
+  if (!targets.length) return;
+  const vals = {
+    client: document.getElementById("beClient").value.trim(),
+    docType: document.getElementById("beType").value.trim(),
+    date: document.getElementById("beDate").value.trim(),
+  };
+  if (!vals.client && !vals.docType && !vals.date) return;
+  targets.forEach(function (item) {
+    ["client", "docType", "date"].forEach(function (f) {
+      if (!vals[f]) return;            // 비워둔 칸은 건드리지 않음
+      item[f] = vals[f];
+      item.edited = item.edited || {};
+      item.edited[f] = true;
+    });
+    refreshCard(item);
+  });
+  paintBulkEdit();
+});
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function stampNow() {
+  const d = new Date();
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " +
+    pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+}
+
+async function downloadSingle(item) {
+  const outputs = await getConversionOutputs(item);
+  const base = buildBaseName(item);
+  item.downloadedAt = stampNow();
+  if (outputs.length === 1) {
+    triggerDownload(outputs[0].blob, base + "." + outputs[0].ext);
+  } else {
+    const zip = new JSZip();
+    outputs.forEach(function (o, idx) { zip.file(base + "_p" + (idx + 1) + "." + o.ext, o.blob); });
+    triggerDownload(await zip.generateAsync({ type: "blob" }), base + ".zip");
+  }
+}
+
+/* =========================================================
+   8) 파일 추가 · 분석 파이프라인
+========================================================= */
+function currentOpts() {
+  return {
+    useFileName: document.getElementById("optUseFileName").checked,
+    useFileDate: document.getElementById("optUseFileDate").checked,
+    forceOcr: document.getElementById("optForceOcr").checked,
+  };
+}
+
+/* ---- 진행률 표시 / 중단 ---- */
+const progressBar = document.getElementById("progressBar");
+const pgText = document.getElementById("pgText");
+const pgFill = document.getElementById("pgFill");
+const pgCancel = document.getElementById("pgCancel");
+let job = { running: false, total: 0, done: 0, cancel: false, sub: 0, subText: "", name: "" };
+
+function paintProgress() {
+  if (!job.running) { progressBar.style.display = "none"; return; }
+  progressBar.style.display = "flex";
+  const pct = job.total ? Math.min(100, Math.round(((job.done + job.sub) / job.total) * 100)) : 0;
+  pgFill.style.width = pct + "%";
+  pgText.textContent = Math.min(job.done + 1, job.total) + " / " + job.total + " · " +
+    (job.name || "") + (job.subText ? " · " + job.subText : "");
+}
+
+pgCancel.addEventListener("click", async function () {
+  job.cancel = true;
+  pgCancel.disabled = true;
+  pgText.textContent = "중단하는 중...";
+  await terminateOcrWorker();   // 진행 중인 OCR을 즉시 끊음
+});
+
+async function addFiles(fileArray) {
+  job.running = true;
+  job.cancel = false;
+  job.total += fileArray.length;
+  job.sub = 0;
+  pgCancel.disabled = false;
+  paintProgress();
+
+  for (const file of fileArray) {
+    if (job.cancel) break;
+    job.name = file.name;
+    job.sub = 0;
+    job.subText = "";
+    paintProgress();
+    const item = {
+      id: seq++, file: file, docType: null, client: null, date: null,
+      method: "", status: "busy", statusMsg: "", expanded: false, targetFormat: "",
+      cands: { docType: [], client: [], date: [] }, src: {}, edited: {},
+    };
+    state.push(item);
+    mountCard(item);
+
+    const opts = currentOpts();
+    const ext = getExt(file.name);
+
+    // OCR 진행률을 이 파일의 진행 막대에 연결
+    ocrProgress = function (p, label) {
+      job.sub = Math.max(0, Math.min(0.95, p || 0));
+      job.subText = label + " " + Math.round((p || 0) * 100) + "%";
+      item.statusMsg = job.subText;
+      paintProgress();
+    };
+
+    const doc = await extractDoc(file, function (msg) {
+      item.statusMsg = msg;
+      job.subText = msg;
+      paintProgress();
+      refreshCard(item);
+    });
+    item.method = doc.method;
+    analyzeDoc(item, doc, opts);
+
+    const missingCount = function () {
+      return [item.docType, item.client, item.date].filter(function (v) { return !v; }).length;
+    };
+    /* 값이 있어도 근거가 약하면(PDF 작성정보·파일 수정일 등) 아직 못 찾은 것으로 본다.
+       그래야 스캔 계약서 뒷장에 있는 진짜 계약일자를 마저 읽는다. */
+    const weakCount = function () {
+      return ["docType", "client", "date"].filter(function (f) {
+        const s = item.src && item.src[f];
+        return !item[f] || !s || s.score < 40;
+      }).length;
+    };
+
+    /* 스캔본은 첫 장만 읽으면 서명란·마지막 장에 있는 상호·날짜를 놓친다.
+       아직 확실하지 않은 항목이 있을 때만 다음 장을 추가로 읽는다 (최대 4쪽까지). */
+    if (ext === "pdf" && doc.method === "OCR 인식" && doc.pdfDoc && doc.pdfDoc.numPages > 1) {
+      const lastPage = Math.min(MAX_OCR_PAGES, doc.pdfDoc.numPages);
+      for (let p = 2; p <= lastPage; p++) {
+        if (job.cancel || weakCount() === 0) break;
+        item.statusMsg = "스캔 " + p + "쪽 추가 인식 중";
+        job.subText = item.statusMsg;
+        paintProgress();
+        refreshCard(item);
+        try {
+          const extra = await ocrPdfPage(doc.pdfDoc, p, 3);
+          doc.lines = (doc.lines || []).concat(extra);
+          item.method = "OCR 인식 (" + p + "쪽까지)";
+          analyzeDoc(item, doc, opts);
+        } catch (e) {
+          console.warn("추가 페이지 OCR 실패", e);
+          break;
+        }
+      }
+    }
+
+    // 텍스트는 있었지만 세 항목 중 두 개 이상을 못 찾았으면 OCR로 한 번 더 시도
+    if (opts.forceOcr && ext === "pdf" && doc.method === "텍스트 추출" && doc.pdfDoc && missingCount() >= 2 && !job.cancel) {
+      item.statusMsg = "인식이 부족해 OCR로 재시도 중";
+      refreshCard(item);
+      try {
+        const extra = await ocrPdfPage(doc.pdfDoc, 1, 3);
+        const merged = { lines: (doc.lines || []).concat(extra), method: "텍스트 + OCR", meta: doc.meta };
+        item.method = merged.method;
+        analyzeDoc(item, merged, opts);
+      } catch (e) { console.warn("OCR 재시도 실패", e); }
+    }
+
+    ocrProgress = null;
+
+    if (ext === "hwp" || ext === "doc") {
+      item.method = "지원되지 않는 형식 · 파일명만 참고";
+    }
+    if (job.cancel && item.status === "busy") {
+      item.method = "사용자가 중단함 · 직접 입력해주세요";
+    }
+
+    item.status = "done";
+    item.statusMsg = "";
+    // 못 찾은 항목이 있으면 수정칸을 바로 펼쳐서 곧장 입력할 수 있게 함
+    if (!item.docType || !item.client || !item.date) item.expanded = true;
+    await makeThumb(item, doc);
+    refreshCard(item);
+
+    job.done++;
+    job.sub = 0;
+    job.subText = "";
+    paintProgress();
+  }
+
+  // 이번 묶음이 끝나면 진행 막대를 정리
+  job.running = false;
+  job.total = 0;
+  job.done = 0;
+  job.name = "";
+  ocrProgress = null;
+  paintProgress();
+}
+
+/* =========================================================
+   9) 거래처 목록 저장 / 불러오기
+========================================================= */
+let clientList = [];
+const CLIENT_LIST_KEY = "taxRenamer_clientList";
+const clientListInput = document.getElementById("clientListInput");
+const clientCountEl = document.getElementById("clientCount");
+const clientPanelToggle = document.getElementById("clientPanelToggle");
+const clientPanelBody = document.getElementById("clientPanelBody");
+
+clientPanelToggle.addEventListener("click", function () {
+  const isOpen = clientPanelBody.style.display !== "none";
+  clientPanelBody.style.display = isOpen ? "none" : "block";
+  clientPanelToggle.closest(".client-panel").classList.toggle("open", !isOpen);
+});
+
+// 목록은 [{name, bizNo}] 형태. 예전 버전이 저장한 문자열 배열도 그대로 읽음
+function loadClientList() {
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(CLIENT_LIST_KEY) || "[]"); } catch (e) { saved = []; }
+  if (!Array.isArray(saved)) saved = [];
+  clientList = saved.map(function (e) {
+    if (typeof e === "string") return { name: e.trim(), bizNo: "" };
+    return { name: String((e && e.name) || "").trim(), bizNo: normalizeBizNo(e && e.bizNo) };
+  }).filter(function (e) { return e.name; });
+  paintClientList();
+}
+
+function clientListText() {
+  return clientList.map(function (e) {
+    return e.bizNo ? e.name + ", " + formatBizNo(e.bizNo) : e.name;
+  }).join("\n");
+}
+
+function paintClientList() {
+  clientListInput.value = clientListText();
+  const withBiz = clientList.filter(function (e) { return e.bizNo; }).length;
+  clientCountEl.textContent = clientList.length + "개 저장됨" +
+    (withBiz ? " · 사업자번호 " + withBiz + "개" : "");
+}
+
+function saveClientEntries(entries) {
+  const idx = {};
+  clientList = [];
+  (entries || []).forEach(function (e) {
+    if (!e || !e.name) return;
+    const name = String(e.name).trim();
+    const bizNo = normalizeBizNo(e.bizNo);
+    if (!name) return;
+    if (idx[name] !== undefined) {
+      if (bizNo && !clientList[idx[name]].bizNo) clientList[idx[name]].bizNo = bizNo;
+      return;
+    }
+    idx[name] = clientList.length;
+    clientList.push({ name: name, bizNo: bizNo });
+  });
+  paintClientList();
+  try { localStorage.setItem(CLIENT_LIST_KEY, JSON.stringify(clientList)); } catch (e) {}
+}
+
+// 텍스트 줄 배열을 목록으로 저장
+function saveClientList(lines) {
+  saveClientEntries((lines || []).map(parseClientLine).filter(Boolean));
+}
+
+document.getElementById("saveClientListBtn").addEventListener("click", function () {
+  saveClientList(clientListInput.value.split("\n"));
+});
+
+// 목록을 CSV로 내려받기 (다른 PC·직원과 공유하거나 백업할 때)
+function csvCell(v) {
+  const s = String(v == null ? "" : v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+document.getElementById("exportClientBtn").addEventListener("click", function () {
+  if (!clientList.length) {
+    setSheetStatus("내려받을 거래처가 없어요. 목록을 먼저 채워주세요.", "err");
+    return;
+  }
+  const rows = [["거래처명", "사업자등록번호"]].concat(clientList.map(function (e) {
+    return [e.name, e.bizNo ? formatBizNo(e.bizNo) : ""];
+  }));
+  const csv = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+  const d = new Date();
+  const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
+  triggerDownload(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }),
+    "거래처목록_" + stamp + ".csv");
+  setSheetStatus(clientList.length + "개를 CSV로 내려받았어요. 다른 PC에서는 이 파일을 위에 끌어다 놓으면 그대로 옮겨집니다.", "ok");
+});
+
+loadClientList();
+
+/* =========================================================
+   9-2) 구글시트 연결
+   - 서버 없이 도는 파일이라 로그인을 할 수 없어서,
+     '웹에 게시(CSV)' 또는 '링크가 있는 모든 사용자' 상태의 시트만 읽을 수 있음
+   - 형식이 다른 주소를 붙여넣어도 되도록 후보 주소를 차례로 시도
+========================================================= */
+const SHEET_URL_KEY = "taxRenamer_sheetUrl";
+const SHEET_AUTO_KEY = "taxRenamer_sheetAuto";
+const sheetUrlInput = document.getElementById("sheetUrl");
+const sheetStatusEl = document.getElementById("sheetStatus");
+const sheetAutoEl = document.getElementById("sheetAuto");
+const sheetSyncBtn = document.getElementById("sheetSyncBtn");
+
+function setSheetStatus(msg, kind) {
+  sheetStatusEl.textContent = msg;
+  sheetStatusEl.className = "sheet-status" + (kind ? " " + kind : "");
+}
+
+// 붙여넣은 주소에서 CSV로 읽을 수 있는 후보 주소들을 만들어냄
+function buildCsvUrls(input) {
+  const url = (input || "").trim();
+  if (!url) return [];
+  const out = [];
+  const gidMatch = url.match(/[#&?]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : null;
+
+  // 이미 CSV로 게시된 주소
+  if (/output=csv/.test(url)) out.push(url);
+
+  // 웹에 게시 주소 : /spreadsheets/d/e/2PACX-.../pub...
+  const pubId = url.match(/\/spreadsheets\/d\/e\/([A-Za-z0-9_-]+)/);
+  if (pubId) {
+    out.push("https://docs.google.com/spreadsheets/d/e/" + pubId[1] +
+      "/pub?output=csv&single=true" + (gid ? "&gid=" + gid : ""));
+  }
+
+  // 일반 시트 주소 : /spreadsheets/d/<ID>/edit#gid=0
+  const docId = url.match(/\/spreadsheets\/d\/(?!e\/)([A-Za-z0-9_-]+)/);
+  if (docId) {
+    out.push("https://docs.google.com/spreadsheets/d/" + docId[1] +
+      "/gviz/tq?tqx=out:csv" + (gid ? "&gid=" + gid : ""));
+    out.push("https://docs.google.com/spreadsheets/d/" + docId[1] +
+      "/export?format=csv" + (gid ? "&gid=" + gid : ""));
+    out.push("https://docs.google.com/spreadsheets/d/" + docId[1] +
+      "/pub?output=csv&single=true" + (gid ? "&gid=" + gid : ""));
+  }
+
+  if (!out.length) out.push(url); // 형식을 모르면 그대로 한 번 시도
+  return Array.from(new Set(out));
+}
+
+// 따옴표·줄바꿈이 들어간 셀까지 처리하는 CSV 파서
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cur = "", inQuote = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuote) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { cur += '"'; i++; }
+        else inQuote = false;
+      } else cur += ch;
+    } else if (ch === '"') inQuote = true;
+    else if (ch === ",") { row.push(cur); cur = ""; }
+    else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (ch !== "\r") cur += ch;
+  }
+  if (cur.length || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+/* 표에서 거래처명 열을 찾아냄.
+   머리글이 몇 번째 줄에 있든(제목줄이 위에 있어도) 앞 10줄에서 찾고,
+   머리글이 아예 없으면 '이름처럼 생긴 값'이 가장 많은 열을 고름 */
+const SHEET_HEADER_RE = /(거래처|상호|업체|업소|회사|법인|사업자명|사업장명|고객|관여처|수임처|거래선|매출처|매입처|납세자|성명|이름|name|client|company|customer)/i;
+
+// 머리글 줄인지 판단할 때 쓰는 '흔한 항목 이름'들 (거래처명 열을 못 찾았을 때 보조 판단)
+const GENERIC_HEADER_RE = /^(번호|연번|순번|no\.?|담당|담당자|연락처|전화|전화번호|휴대폰|비고|메모|구분|분류|코드|주소|소재지|대표|대표자|사업자|사업자번호|등록번호|사업자등록번호|이메일|날짜|일자|등록일|금액|업태|종목)$/i;
+
+function normalizeRows(rows) {
+  const list = (rows || []).map(function (r) {
+    return (r || []).map(function (c) { return c == null ? "" : String(c).trim(); });
+  });
+  const max = list.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
+  list.forEach(function (r) { while (r.length < max) r.push(""); });
+  return list.filter(function (r) { return r.some(function (c) { return c; }); });
+}
+
+function colLetter(i) {
+  let s = "", n = i + 1;
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+// 상호/성명으로 쓸 만한 값인지
+function looksLikeName(v) {
+  if (!v) return false;
+  const s = String(v).trim();
+  if (s.length < 2 || s.length > 30) return false;
+  if (/^[\d\s.,\-/()]+$/.test(s)) return false;          // 숫자·기호뿐
+  if (/^\d{2,3}-\d{2}-\d{5}$/.test(s)) return false;      // 사업자등록번호
+  if (/^\d{6}-\d{7}$/.test(s)) return false;              // 주민등록번호
+  if (/^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}$/.test(s)) return false; // 날짜
+  return /[가-힣A-Za-z]/.test(s);
+}
+
+function guessLayout(rows) {
+  // 1) 앞 10줄에서 머리글 줄 찾기.
+  //    '2026년 관여처 명단' 같은 제목줄을 머리글로 오인하지 않도록
+  //    - 그 줄에 항목이 2개 이상 있어야 하고
+  //    - 머리글 칸은 짧은 이름표여야 하며
+  //    - 그 아래에 실제 상호가 있어야 함
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const cells = rows[i];
+    if (cells.filter(Boolean).length < 2) continue;
+    const idx = cells.findIndex(function (h) {
+      return h && h.length <= 10 && SHEET_HEADER_RE.test(h);
+    });
+    if (idx !== -1 && namesFrom(rows, i, idx).length > 0) return { headerRow: i, col: idx };
+  }
+  // 2) 머리글을 못 찾으면 상호처럼 보이는 값이 가장 많은 열을 고름
+  const nCols = rows.length ? rows[0].length : 0;
+  let best = 0, bestHit = -1;
+  for (let c = 0; c < nCols; c++) {
+    let hit = 0;
+    for (let r = 0; r < rows.length; r++) if (looksLikeName(rows[r][c])) hit++;
+    if (hit > bestHit) { bestHit = hit; best = c; }
+  }
+  // 첫 줄이 머리글인지 : 다른 칸에 '번호/연락처' 같은 흔한 이름표가 있으면 머리글로 봄
+  const firstRow = rows.length ? rows[0] : [];
+  const looksHeader = firstRow.some(function (h) { return h && GENERIC_HEADER_RE.test(h); }) ||
+    (firstRow[best] && SHEET_HEADER_RE.test(firstRow[best]) && firstRow[best].length <= 10) ||
+    !looksLikeName(firstRow[best]);
+  return { headerRow: looksHeader ? 0 : -1, col: best };
+}
+
+function namesFrom(rows, headerRow, col) {
+  const out = [];
+  for (let i = Math.max(0, headerRow + 1); i < rows.length; i++) {
+    const v = rows[i][col];
+    if (looksLikeName(v) && out.indexOf(v) === -1) out.push(v);
+  }
+  return out;
+}
+
+// 이름 열 + 사업자번호 열을 함께 읽어 목록 항목으로 만듦
+function entriesFrom(rows, headerRow, nameCol, bizCol) {
+  const out = [], seen = {};
+  for (let i = Math.max(0, headerRow + 1); i < rows.length; i++) {
+    const v = rows[i][nameCol];
+    if (!looksLikeName(v) || seen[v]) continue;
+    seen[v] = true;
+    const raw = bizCol >= 0 ? rows[i][bizCol] : "";
+    const d = normalizeBizNo(raw);
+    out.push({ name: v, bizNo: d.length === 10 ? d : "" });
+  }
+  return out;
+}
+
+// 사업자번호가 들어있는 열 추측 : 머리글로 먼저, 없으면 값의 생김새로
+const BIZ_HEADER_RE = /(사업자|등록번호|사업자번호|사업자등록번호|bizno|biz_no)/i;
+function guessBizCol(rows, headerRow, nameCol) {
+  const nCols = rows.length ? rows[0].length : 0;
+  if (headerRow >= 0) {
+    for (let c = 0; c < nCols; c++) {
+      const h = rows[headerRow][c];
+      if (c !== nameCol && h && h.length <= 12 && BIZ_HEADER_RE.test(h)) return c;
+    }
+  }
+  let best = -1, bestHit = 0;
+  for (let c = 0; c < nCols; c++) {
+    if (c === nameCol) continue;
+    let hit = 0, tot = 0;
+    for (let r = Math.max(0, headerRow + 1); r < rows.length; r++) {
+      const v = rows[r][c];
+      if (!v) continue;
+      tot++;
+      if (normalizeBizNo(v).length === 10) hit++;
+    }
+    if (tot && hit >= Math.max(1, tot * 0.6) && hit > bestHit) { bestHit = hit; best = c; }
+  }
+  return best;
+}
+
+function colLabel(rows, headerRow, col) {
+  const h = headerRow >= 0 && rows[headerRow] ? rows[headerRow][col] : "";
+  return h ? '"' + h + '" 열' : colLetter(col) + "열";
+}
+
+function pickNamesFromRows(rowsRaw) {
+  const rows = normalizeRows(rowsRaw);
+  if (!rows.length) return { names: [], entries: [], colInfo: "", rows: rows, headerRow: -1, col: 0, bizCol: -1 };
+  const g = guessLayout(rows);
+  const bizCol = guessBizCol(rows, g.headerRow, g.col);
+  return {
+    names: namesFrom(rows, g.headerRow, g.col),
+    entries: entriesFrom(rows, g.headerRow, g.col, bizCol),
+    colInfo: colLabel(rows, g.headerRow, g.col) +
+      (bizCol >= 0 ? " + 사업자번호 " + colLabel(rows, g.headerRow, bizCol) : ""),
+    rows: rows,
+    headerRow: g.headerRow,
+    col: g.col,
+    bizCol: bizCol,
+  };
+}
+
+/* ---- 시트 파일 끌어다 놓기 / 표 붙여넣기 (공유 설정 변경 불필요) ---- */
+
+// 탭으로 구분된 표(구글시트에서 복사한 내용)와 CSV를 모두 처리
+function parseTable(text) {
+  const clean = String(text || "").replace(/^﻿/, "");
+  const firstLine = clean.split(/\r?\n/)[0] || "";
+  if (firstLine.indexOf("\t") !== -1) {
+    return clean.split(/\r?\n/).filter(function (l) { return l.trim(); })
+      .map(function (l) { return l.split("\t"); });
+  }
+  return parseCSV(clean);
+}
+
+async function namesFromFile(file) {
+  const ext = getExt(file.name);
+  if (["xlsx", "xls", "ods", "xlsm"].includes(ext)) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    let fallback = null;
+    for (const nm of wb.SheetNames) {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, blankrows: false, raw: false })
+        .map(function (r) { return (r || []).map(function (c) { return c == null ? "" : String(c); }); });
+      const picked = pickNamesFromRows(rows);
+      if (picked.rows.length && !fallback) fallback = picked;
+      if (picked.names.length) {
+        picked.colInfo = '"' + nm + '" 시트의 ' + picked.colInfo;
+        return picked;
+      }
+    }
+    return fallback || { names: [], colInfo: "", rows: [], headerRow: -1, col: 0 };
+  }
+  return pickNamesFromRows(parseTable(await file.text()));
+}
+
+/* ---- 어느 열을 쓸지 직접 고르는 화면 ---- */
+const colPickerEl = document.getElementById("colPicker");
+let pickerRows = null;
+
+function hideColPicker() {
+  colPickerEl.style.display = "none";
+  colPickerEl.innerHTML = "";
+  pickerRows = null;
+}
+
+function renderColPicker(rows, headerRow, col, sourceLabel, bizCol) {
+  pickerRows = rows;
+  if (!rows.length) { hideColPicker(); return; }
+  const nCols = rows[0].length;
+  if (bizCol === undefined) bizCol = guessBizCol(rows, headerRow, col);
+
+  const headOpts = ['<option value="-1"' + (headerRow === -1 ? " selected" : "") + ">머리글 없음 (첫 줄부터 거래처명)</option>"];
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const peek = rows[i].filter(Boolean).slice(0, 4).join(" | ").slice(0, 38);
+    headOpts.push('<option value="' + i + '"' + (headerRow === i ? " selected" : "") + ">" +
+      (i + 1) + "번째 줄" + (peek ? " : " + esc(peek) : "") + "</option>");
+  }
+
+  const colOpts = [];
+  for (let c = 0; c < nCols; c++) {
+    const hv = headerRow >= 0 ? rows[headerRow][c] : "";
+    let sample = "";
+    for (let r = Math.max(0, headerRow + 1); r < rows.length; r++) {
+      if (rows[r][c]) { sample = rows[r][c].slice(0, 12); break; }
+    }
+    colOpts.push('<option value="' + c + '"' + (col === c ? " selected" : "") + ">" +
+      colLetter(c) + (hv ? " · " + esc(hv) : "") + (sample ? "  (예: " + esc(sample) + ")" : "  (비어 있음)") + "</option>");
+  }
+
+  const bizOpts = ['<option value="-1"' + (bizCol === -1 ? " selected" : "") + ">사용 안 함</option>"];
+  for (let c = 0; c < nCols; c++) {
+    const hv = headerRow >= 0 ? rows[headerRow][c] : "";
+    let sample = "";
+    for (let r = Math.max(0, headerRow + 1); r < rows.length; r++) {
+      if (rows[r][c]) { sample = rows[r][c].slice(0, 14); break; }
+    }
+    bizOpts.push('<option value="' + c + '"' + (bizCol === c ? " selected" : "") + ">" +
+      colLetter(c) + (hv ? " · " + esc(hv) : "") + (sample ? "  (예: " + esc(sample) + ")" : "") + "</option>");
+  }
+
+  const entries = entriesFrom(rows, headerRow, col, bizCol);
+  const bizCount = entries.filter(function (e) { return e.bizNo; }).length;
+  const preview = entries.length
+    ? "<b>" + entries.length + "개</b>" + (bizCount ? " (사업자번호 " + bizCount + "개 포함)" : "") + " · " +
+      esc(entries.slice(0, 6).map(function (e) { return e.name; }).join(", ")) + (entries.length > 6 ? " …" : "")
+    : "<b>0개</b> · 이 열에는 상호로 볼 만한 값이 없어요. 다른 열을 골라보세요.";
+
+  colPickerEl.innerHTML =
+    '<div class="cp-title">읽은 표 : ' + esc(sourceLabel) + " · " + rows.length + "줄 × " + nCols + "열</div>" +
+    '<div class="cp-row">' +
+      '<div class="cp-field"><label>머리글 줄</label><select id="cpHeader">' + headOpts.join("") + "</select></div>" +
+      '<div class="cp-field"><label>거래처명이 있는 열</label><select id="cpCol">' + colOpts.join("") + "</select></div>" +
+      '<div class="cp-field"><label>사업자등록번호 열 (있으면 정확도가 크게 올라가요)</label><select id="cpBiz">' + bizOpts.join("") + "</select></div>" +
+    "</div>" +
+    '<div class="cp-preview">' + preview + "</div>" +
+    '<div class="cp-actions">' +
+      '<button type="button" class="cp-apply" id="cpApply"' + (entries.length ? "" : " disabled") + ">이 열로 목록 만들기</button>" +
+      '<button type="button" class="cp-close" id="cpClose">닫기</button>' +
+    "</div>";
+  colPickerEl.style.display = "block";
+
+  const hSel = document.getElementById("cpHeader");
+  const cSel = document.getElementById("cpCol");
+  const bSel = document.getElementById("cpBiz");
+  function onChange(keepBiz) {
+    const nextCol = parseInt(cSel.value, 10);
+    renderColPicker(rows, parseInt(hSel.value, 10), nextCol, sourceLabel,
+      keepBiz ? parseInt(bSel.value, 10) : undefined);
+  }
+  hSel.addEventListener("change", function () { onChange(false); });
+  cSel.addEventListener("change", function () { onChange(false); });
+  bSel.addEventListener("change", function () { onChange(true); });
+  document.getElementById("cpClose").addEventListener("click", hideColPicker);
+  document.getElementById("cpApply").addEventListener("click", function () {
+    saveClientEntries(entries);
+    setSheetStatus(sourceLabel + "에서 " + entries.length + "개를 목록에 넣었어요 (" +
+      colLabel(rows, headerRow, col) +
+      (bizCol >= 0 ? " + 사업자번호 " + colLabel(rows, headerRow, bizCol) : "") + " 기준).", "ok");
+  });
+}
+
+async function loadClientFile(file) {
+  if (!file) return;
+  // 구글 드라이브 바로가기 파일은 내용이 없음
+  if (/\.(gsheet|gdoc|gslides|url|lnk)$/i.test(file.name)) {
+    setSheetStatus("이건 구글 드라이브 '바로가기' 파일이라 내용이 없어요. 시트를 연 뒤 파일 → 다운로드 → CSV(또는 .xlsx)로 내려받아 주세요.", "err");
+    hideColPicker();
+    return;
+  }
+  setSheetStatus('"' + file.name + '" 읽는 중...');
+  try {
+    const picked = await namesFromFile(file);
+    if (!picked.rows || !picked.rows.length) {
+      setSheetStatus('"' + file.name + '"에서 표를 찾지 못했어요. CSV 또는 .xlsx로 다시 내려받아 주세요.', "err");
+      hideColPicker();
+      return;
+    }
+    if (picked.names.length) {
+      saveClientEntries(picked.entries);
+      setSheetStatus('"' + file.name + '"에서 ' + picked.names.length + "개를 불러왔어요 (" + picked.colInfo +
+        " 기준). 열을 잘못 골랐으면 아래에서 바꿔주세요.", "ok");
+    } else {
+      setSheetStatus('"' + file.name + '"은 읽었는데 어느 열이 거래처명인지 판단하지 못했어요. 아래에서 직접 골라주세요.', "err");
+    }
+    renderColPicker(picked.rows, picked.headerRow, picked.col, file.name, picked.bizCol);
+  } catch (e) {
+    setSheetStatus("파일을 읽지 못했어요: " + (e && e.message ? e.message : e), "err");
+    hideColPicker();
+  }
+}
+
+async function fetchSheetNames(rawUrl) {
+  const urls = buildCsvUrls(rawUrl);
+  if (!urls.length) throw new Error("주소를 입력해주세요.");
+  let lastErr = "";
+  for (const u of urls) {
+    let text;
+    try {
+      const res = await fetch(u, { redirect: "follow" });
+      if (!res.ok) { lastErr = "시트를 열 수 없어요 (HTTP " + res.status + "). 공유 설정을 확인해주세요."; continue; }
+      text = await res.text();
+    } catch (e) {
+      lastErr = "브라우저가 연결을 막았어요. '웹에 게시 → CSV' 주소를 사용해보세요.";
+      continue;
+    }
+    if (/^\s*<(!doctype|html)/i.test(text)) {
+      lastErr = "시트가 비공개 상태예요. 공유 설정을 바꾸거나 '웹에 게시 → CSV' 주소를 사용해주세요.";
+      continue;
+    }
+    const picked = pickNamesFromRows(parseTable(text));
+    if (picked.names.length) return picked;
+    lastErr = "시트는 열렸는데 거래처명을 찾지 못했어요. 첫 번째 열에 상호가 있는지 확인해주세요.";
+  }
+  throw new Error(lastErr || "불러오지 못했어요.");
+}
+
+async function syncSheet(silent) {
+  const raw = sheetUrlInput.value.trim();
+  if (!raw) { if (!silent) setSheetStatus("구글시트 주소를 먼저 붙여넣어 주세요.", "err"); return; }
+  sheetSyncBtn.disabled = true;
+  setSheetStatus("불러오는 중...");
+  try {
+    const picked = await fetchSheetNames(raw);
+    saveClientEntries(picked.entries);
+    try { localStorage.setItem(SHEET_URL_KEY, raw); } catch (e) {}
+    setSheetStatus("구글시트에서 " + picked.names.length + "개를 불러왔어요 (" + picked.colInfo + " 기준). 위 목록이 시트 내용으로 바뀌었어요.", "ok");
+  } catch (e) {
+    setSheetStatus((e && e.message ? e.message : "불러오지 못했어요.") + (silent ? " (저장해둔 목록을 그대로 씁니다)" : ""), "err");
+  } finally {
+    sheetSyncBtn.disabled = false;
+  }
+}
+
+/* 시트 파일 끌어다 놓기 */
+const clientDrop = document.getElementById("clientDrop");
+const clientFileInput = document.getElementById("clientFileInput");
+
+clientDrop.addEventListener("click", function (e) {
+  if (e.target.tagName !== "LABEL") clientFileInput.click();
+});
+clientFileInput.addEventListener("change", function (e) {
+  if (e.target.files && e.target.files[0]) loadClientFile(e.target.files[0]);
+  e.target.value = "";
+});
+["dragenter", "dragover"].forEach(function (evt) {
+  clientDrop.addEventListener(evt, function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    clientDrop.classList.add("dragover");
+  });
+});
+["dragleave", "drop"].forEach(function (evt) {
+  clientDrop.addEventListener(evt, function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    clientDrop.classList.remove("dragover");
+  });
+});
+clientDrop.addEventListener("drop", function (e) {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) loadClientFile(f);
+});
+
+/* 시트에서 표를 통째로 붙여넣으면 거래처명 열만 골라냄 */
+clientListInput.addEventListener("paste", function (e) {
+  const data = e.clipboardData || window.clipboardData;
+  if (!data) return;
+  const text = data.getData("text");
+  if (!text) return;
+  const lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+  const looksLikeTable = lines.length >= 2 &&
+    (text.indexOf("\t") !== -1 || lines.filter(function (l) { return l.indexOf(",") !== -1; }).length >= lines.length - 1);
+  if (!looksLikeTable) return; // 그냥 이름 목록이면 평소대로 붙여넣기
+  e.preventDefault();
+  const picked = pickNamesFromRows(parseTable(text));
+  if (picked.names.length) {
+    saveClientEntries(picked.entries);
+    setSheetStatus("붙여넣은 표에서 " + picked.names.length + "개를 골라냈어요 (" + picked.colInfo +
+      " 기준). 열을 잘못 골랐으면 아래에서 바꿔주세요.", "ok");
+  } else {
+    setSheetStatus("붙여넣은 표에서 어느 열이 거래처명인지 판단하지 못했어요. 아래에서 직접 골라주세요.", "err");
+  }
+  renderColPicker(picked.rows, picked.headerRow, picked.col, "붙여넣은 표", picked.bizCol);
+});
+
+sheetSyncBtn.addEventListener("click", function () { syncSheet(false); });
+sheetUrlInput.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") { e.preventDefault(); syncSheet(false); }
+});
+sheetAutoEl.addEventListener("change", function () {
+  try { localStorage.setItem(SHEET_AUTO_KEY, sheetAutoEl.checked ? "1" : "0"); } catch (e) {}
+});
+
+(function initSheet() {
+  let savedUrl = "", auto = false;
+  try {
+    savedUrl = localStorage.getItem(SHEET_URL_KEY) || "";
+    auto = localStorage.getItem(SHEET_AUTO_KEY) === "1";
+  } catch (e) {}
+  sheetUrlInput.value = savedUrl;
+  sheetAutoEl.checked = auto;
+  if (savedUrl && auto) syncSheet(true);
+  else if (savedUrl) setSheetStatus("저장해둔 시트 주소가 있어요. '불러오기'를 누르면 최신 목록을 가져옵니다.");
+})();
+
+/* =========================================================
+   10) 드래그앤드롭 · 일괄 처리
+========================================================= */
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+
+dropzone.addEventListener("click", function (e) {
+  if (e.target.tagName !== "LABEL") fileInput.click();
+});
+// 처리 가능한 파일만 추려냄 (폴더에는 관계없는 파일이 섞여 있음)
+const HANDLED_EXTS = ["pdf", "jpg", "jpeg", "png", "bmp", "gif", "webp", "xlsx", "xls", "xlsm", "csv", "docx", "doc", "txt", "hwp", "hwpx"];
+function keepHandled(files) {
+  return files.filter(function (f) {
+    if (f.name.indexOf(".") === 0) return false;   // .DS_Store 같은 숨김 파일
+    return HANDLED_EXTS.includes(getExt(f.name));
+  });
+}
+
+fileInput.addEventListener("change", function (e) {
+  addFiles(Array.from(e.target.files));
+  fileInput.value = "";
+});
+
+// 폴더 통째로 올리기 (하위 폴더까지 훑음)
+const folderInput = document.getElementById("folderInput");
+folderInput.addEventListener("change", function (e) {
+  const all = Array.from(e.target.files);
+  const use = keepHandled(all);
+  folderInput.value = "";
+  if (!use.length) {
+    alert("그 폴더에서 처리할 수 있는 파일을 찾지 못했어요.");
+    return;
+  }
+  if (all.length !== use.length) {
+    if (!confirm("파일 " + all.length + "개 중 처리 가능한 " + use.length + "개만 가져올게요. 계속할까요?")) return;
+  }
+  addFiles(use);
+});
+
+// 탐색기에서 폴더를 끌어다 놓는 경우 (하위 폴더까지 재귀로 수집)
+async function filesFromDataTransfer(dt) {
+  const items = dt.items ? Array.from(dt.items) : [];
+  const entries = items.map(function (i) {
+    return i.webkitGetAsEntry ? i.webkitGetAsEntry() : null;
+  }).filter(Boolean);
+  if (!entries.length || !entries.some(function (en) { return en.isDirectory; })) {
+    return Array.from(dt.files);
+  }
+  const out = [];
+  async function walk(entry, depth) {
+    if (depth > 6) return;
+    if (entry.isFile) {
+      const f = await new Promise(function (res) { entry.file(res, function () { res(null); }); });
+      if (f) out.push(f);
+      return;
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      while (true) {
+        const batch = await new Promise(function (res) { reader.readEntries(res, function () { res([]); }); });
+        if (!batch.length) break;
+        for (const e of batch) await walk(e, depth + 1);
+      }
+    }
+  }
+  for (const en of entries) await walk(en, 0);
+  return out;
+}
+["dragenter", "dragover"].forEach(function (evt) {
+  dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.add("dragover"); });
+});
+["dragleave", "drop"].forEach(function (evt) {
+  dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.remove("dragover"); });
+});
+dropzone.addEventListener("drop", async function (e) {
+  const collected = await filesFromDataTransfer(e.dataTransfer);
+  const use = keepHandled(collected);
+  if (!use.length) {
+    if (collected.length) alert("처리할 수 있는 파일을 찾지 못했어요.");
+    return;
+  }
+  addFiles(use);
+});
+
+/* 처리 이력을 CSV로 내려받기 : 어떤 원본이 어떤 이름으로 바뀌었는지 추적용 */
+document.getElementById("logBtn").addEventListener("click", function () {
+  if (!state.length) return;
+  const why = function (item, f) {
+    if (item.edited && item.edited[f]) return "직접 입력";
+    const s = item.src && item.src[f];
+    return s && item[f] ? s.why : "못 찾음";
+  };
+  const rows = [[
+    "원본 파일명", "새 파일명", "문서종류", "거래처명", "날짜",
+    "문서종류 근거", "거래처 근거", "날짜 근거", "추출 방식", "사업자등록번호", "다운로드 시각",
+  ]];
+  state.forEach(function (item) {
+    rows.push([
+      item.file.name,
+      previewName(item),
+      item.docType || "",
+      item.client || "",
+      item.date || "",
+      why(item, "docType"),
+      why(item, "client"),
+      why(item, "date"),
+      item.method || "",
+      (item.bizNos || []).map(function (b) { return formatBizNo(b.d); }).join(" "),
+      item.downloadedAt || "",
+    ]);
+  });
+  const csv = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+  const d = new Date();
+  const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "_" + pad2(d.getHours()) + pad2(d.getMinutes());
+  triggerDownload(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }), "처리이력_" + stamp + ".csv");
+});
+
+document.getElementById("clearAllBtn").addEventListener("click", function () {
+  closePreview();
+  state.forEach(releaseItem);
+  state.length = 0;
+  fileListEl.innerHTML = "";
+  updateChrome();
+});
+
+/* 거래처별 폴더 묶기 설정은 다음에 열어도 유지 */
+const ZIP_GROUP_KEY = "taxRenamer_zipGroup";
+const optZipGroup = document.getElementById("optZipGroup");
+try {
+  const v = localStorage.getItem(ZIP_GROUP_KEY);
+  if (v !== null) optZipGroup.checked = v === "1";
+} catch (e) {}
+optZipGroup.addEventListener("change", function () {
+  try { localStorage.setItem(ZIP_GROUP_KEY, optZipGroup.checked ? "1" : "0"); } catch (e) {}
+});
+
+document.getElementById("zipBtn").addEventListener("click", async function () {
+  if (!state.length) return;
+  const btn = document.getElementById("zipBtn");
+  btn.disabled = true;
+  btn.textContent = "압축 중...";
+  try {
+    const zip = new JSZip();
+    const used = {};
+    const groupByClient = document.getElementById("optZipGroup").checked;
+    for (const item of state) {
+      const outputs = await getConversionOutputs(item);
+      const base = buildBaseName(item);
+      item.downloadedAt = stampNow();
+      // 거래처별 폴더로 묶기. 거래처를 못 찾은 파일은 따로 모아둠
+      const folder = groupByClient
+        ? (sanitize(item.client) || "_미확인거래처") + "/"
+        : "";
+      outputs.forEach(function (o, idx) {
+        let name = folder + (outputs.length > 1 ? base + "_p" + (idx + 1) + "." + o.ext : base + "." + o.ext);
+        if (used[name] !== undefined) {
+          used[name]++;
+          const dot = name.lastIndexOf(".");
+          name = dot === -1 ? name + "(" + used[name] + ")" : name.slice(0, dot) + "(" + used[name] + ")" + name.slice(dot);
+        } else {
+          used[name] = 0;
+        }
+        zip.file(name, o.blob);
+      });
+    }
+    triggerDownload(await zip.generateAsync({ type: "blob" }), "변환된_파일모음.zip");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "전체 압축 다운로드 (ZIP)";
+  }
+});
+
+updateChrome();
+</script>
+</body>
+</html>
