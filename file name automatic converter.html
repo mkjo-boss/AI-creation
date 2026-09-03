@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>file name automatic converter</title>
+<title>파일명 자동 변환기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600&family=Gowun+Dodum&display=swap" rel="stylesheet">
@@ -16,24 +17,28 @@
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <style>
   :root{
-    --bg:#F7F5FB;
+    --bg:#FFFDF2;
     --panel:#FFFFFF;
-    --ink:#312E3D;
-    --ink-soft:#6A6680;
-    --line:#E6E0F2;
-    --lavender:#B7A6E0;
-    --lavender-deep:#8F79C7;
-    --lavender-wash:#EFE9FA;
-    --mint:#9FD9BE;
-    --mint-deep:#5FAE8B;
-    --mint-wash:#E4F6ED;
-    --peach:#F0B7B0;
-    --peach-deep:#D4837A;
-    --peach-wash:#FBEAE7;
-    --sky:#A9C8EE;
-    --sky-wash:#E9F1FC;
+    --ink:#46402F;
+    --ink-soft:#8A7F63;
+    --line:#F2E6C4;
+    /* 기본 색 : 노랑 */
+    --lavender:#F5D451;
+    --lavender-deep:#8D6C15;
+    --lavender-wash:#FFF6D9;
+    /* 성공 표시 : 노랑과 구분되도록 초록 */
+    --mint:#A8DCC6;
+    --mint-deep:#3F9873;
+    --mint-wash:#E8F7F0;
+    /* 확인 필요 표시 : 노랑과 겹치지 않게 산호빛 */
+    --peach:#F2A9A0;
+    --peach-deep:#C4564A;
+    --peach-wash:#FCEAE8;
+    /* 진행 중 표시 */
+    --sky:#B4BFEC;
+    --sky-wash:#EEF1FD;
     --radius:14px;
-    --shadow:0 6px 20px rgba(143,121,199,0.10);
+    --shadow:0 6px 20px rgba(160,130,30,0.13);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -98,8 +103,8 @@
   /* drop zone hero */
   #dropzone{
     position:relative;
-    background:linear-gradient(135deg,var(--lavender-wash) 0%, var(--sky-wash) 55%, var(--mint-wash) 100%);
-    border:2px dashed var(--lavender);
+    background:linear-gradient(135deg,#FFF4CE 0%, #FFE7D0 46%, #FFDCE6 100%);
+    border:2px dashed #EFC257;
     border-radius:16px;
     padding:26px 24px;
     text-align:center;
@@ -107,7 +112,8 @@
     transition:border-color .2s ease, transform .15s ease;
   }
   #dropzone.dragover{
-    border-color:var(--mint-deep);
+    border-color:#E07CA5;
+    background:linear-gradient(135deg,#FFEFC2 0%, #FFDFC4 46%, #FFD0E0 100%);
     transform:scale(1.01);
   }
   #dropzone svg{width:42px;height:42px;margin-bottom:8px;}
@@ -210,7 +216,7 @@
   }
   .badge.ok{background:var(--mint-wash);color:var(--mint-deep);}
   .badge.warn{background:var(--peach-wash);color:var(--peach-deep);}
-  .badge.busy{background:var(--sky-wash);color:#5A7DA8;}
+  .badge.busy{background:var(--sky-wash);color:#6273B0;}
   .method-tag{
     color:var(--ink-soft);
     white-space:nowrap;
@@ -250,7 +256,7 @@
     font-size:13.5px;
     font-family:inherit;
     color:var(--ink);
-    background:#FCFBFF;
+    background:#FFFDF5;
   }
   .field input:focus{outline:2px solid var(--lavender);outline-offset:1px;}
   .debug-field{grid-column:1 / -1;}
@@ -262,7 +268,7 @@
     font-family:"Consolas","Malgun Gothic",monospace;
     font-size:11.5px;
     color:var(--ink-soft);
-    background:#F5F3FA;
+    background:#FBF7E8;
     resize:vertical;
   }
 
@@ -410,7 +416,7 @@
     font-family:inherit;
     font-size:13px;
     color:var(--ink);
-    background:#FCFBFF;
+    background:#FFFDF5;
     resize:vertical;
   }
   #clientListInput:focus{outline:2px solid var(--lavender);outline-offset:1px;}
@@ -462,7 +468,7 @@
     font-family:inherit;
     font-size:12.5px;
     color:var(--ink);
-    background:#FCFBFF;
+    background:#FFFDF5;
   }
   #sheetUrl:focus{outline:2px solid var(--lavender);outline-offset:1px;}
   .sheet-btn{
@@ -477,7 +483,7 @@
     cursor:pointer;
   }
   .sheet-btn:hover{background:var(--ink);}
-  .sheet-btn:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .sheet-btn:disabled{background:#DED3B0;cursor:not-allowed;}
   .sheet-status{
     margin-top:8px;
     font-size:12px;
@@ -603,7 +609,7 @@
     cursor:pointer;
   }
   .cp-apply:hover{background:var(--ink);}
-  .cp-apply:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .cp-apply:disabled{background:#DED3B0;cursor:not-allowed;}
   .cp-close{
     background:transparent;
     border:1px solid var(--line);
@@ -622,7 +628,7 @@
     font-family:inherit;
     font-size:12.5px;
     color:var(--ink);
-    background:#FCFBFF;
+    background:#FFFDF5;
   }
   .fmt-note{
     width:100%;
@@ -658,7 +664,7 @@
     cursor:pointer;
     box-shadow:var(--shadow);
   }
-  .zip-btn:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .zip-btn:disabled{background:#DED3B0;cursor:not-allowed;}
   .clear-btn{
     background:transparent;
     border:1px solid var(--line);
@@ -670,12 +676,12 @@
   }
 
   .folder-btn{
-    margin-left:6px;
-    background:transparent;
-    border:1px solid var(--lavender-deep);
-    color:var(--lavender-deep);
+    margin-left:7px;
+    background:#FFFFFF !important;
+    border:1.5px solid #C79A2A;
+    color:#8D6C15 !important;
   }
-  .folder-btn:hover{background:var(--lavender-deep);color:#fff;}
+  .folder-btn:hover{background:#8D6C15 !important;color:#fff !important;border-color:#8D6C15;}
 
   /* 여러 파일 한 번에 지정 */
   .bulk-edit{
@@ -709,7 +715,7 @@
     font-family:inherit;
     font-size:13px;
     color:var(--ink);
-    background:#FCFBFF;
+    background:#FFFDF5;
   }
   .be-field input:focus{outline:2px solid var(--lavender);outline-offset:1px;}
   .be-apply{
@@ -725,7 +731,7 @@
     cursor:pointer;
   }
   .be-apply:hover{background:var(--ink);}
-  .be-apply:disabled{background:#CFCBD9;cursor:not-allowed;}
+  .be-apply:disabled{background:#DED3B0;cursor:not-allowed;}
   .pick-box{
     flex:none;
     width:17px;
@@ -813,9 +819,9 @@
     vertical-align:middle;
   }
   .src-tag.high{background:var(--mint-wash);color:var(--mint-deep);}
-  .src-tag.mid{background:var(--sky-wash);color:#5A7DA8;}
+  .src-tag.mid{background:var(--sky-wash);color:#6273B0;}
   .src-tag.low{background:var(--peach-wash);color:var(--peach-deep);}
-  .src-tag.none{background:#F0EEF6;color:var(--ink-soft);}
+  .src-tag.none{background:#F6F1E2;color:var(--ink-soft);}
 
   .cands{
     grid-column:1 / -1;
@@ -833,7 +839,7 @@
   }
   .chip{
     border:1px solid var(--line);
-    background:#FCFBFF;
+    background:#FFFDF5;
     color:var(--ink);
     border-radius:999px;
     padding:3px 11px;
@@ -846,7 +852,7 @@
 
   .evidence{
     grid-column:1 / -1;
-    background:#F5F3FA;
+    background:#FBF7E8;
     border:1px solid var(--line);
     border-radius:8px;
     padding:8px 10px;
@@ -897,7 +903,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    background:rgba(49,46,61,0.55);
+    background:rgba(74,66,49,0.55);
     color:#fff;
     font-size:15px;
     opacity:0;
@@ -909,7 +915,7 @@
   .pv-backdrop{
     position:fixed;
     inset:0;
-    background:rgba(49,46,61,0.55);
+    background:rgba(74,66,49,0.55);
     display:flex;
     align-items:center;
     justify-content:center;
@@ -919,7 +925,7 @@
   .pv-box{
     background:var(--panel);
     border-radius:16px;
-    box-shadow:0 18px 50px rgba(49,46,61,0.25);
+    box-shadow:0 18px 50px rgba(74,66,49,0.25);
     width:min(980px,100%);
     max-height:100%;
     display:flex;
@@ -947,7 +953,7 @@
   .pv-nav{display:flex;align-items:center;gap:8px;flex:none;font-size:12.5px;color:var(--ink-soft);}
   .pv-nav button{
     border:1px solid var(--line);
-    background:#FCFBFF;
+    background:#FFFDF5;
     color:var(--ink);
     border-radius:8px;
     padding:4px 10px;
@@ -955,7 +961,7 @@
     font-size:12.5px;
     cursor:pointer;
   }
-  .pv-nav button:disabled{color:#C9C5D6;cursor:not-allowed;}
+  .pv-nav button:disabled{color:#DCD1AE;cursor:not-allowed;}
   .pv-close{
     flex:none;
     border:none;
@@ -979,7 +985,7 @@
   .pv-body img,.pv-body canvas{
     max-width:100%;
     border-radius:8px;
-    box-shadow:0 4px 16px rgba(49,46,61,0.14);
+    box-shadow:0 4px 16px rgba(74,66,49,0.14);
     background:#fff;
   }
   .pv-body pre{
@@ -1009,7 +1015,7 @@
   .evidence details{margin-top:6px;}
   .evidence summary{cursor:pointer;color:var(--lavender-deep);font-weight:400;}
 
-  .badge.review{background:var(--sky-wash);color:#5A7DA8;}
+  .badge.review{background:var(--sky-wash);color:#6273B0;}
 
   .opt-row{
     display:flex;
@@ -1096,11 +1102,11 @@
 
   <div id="dropzone">
     <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="10" y="14" width="34" height="42" rx="4" fill="#FFFFFF" stroke="#8F79C7" stroke-width="2"/>
-      <line x1="16" y1="24" x2="38" y2="24" stroke="#B7A6E0" stroke-width="2" stroke-linecap="round"/>
-      <line x1="16" y1="31" x2="38" y2="31" stroke="#B7A6E0" stroke-width="2" stroke-linecap="round"/>
-      <line x1="16" y1="38" x2="30" y2="38" stroke="#B7A6E0" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="46" cy="46" r="13" fill="#9FD9BE"/>
+      <rect x="10" y="14" width="34" height="42" rx="4" fill="#FFFFFF" stroke="#8D6C15" stroke-width="2"/>
+      <line x1="16" y1="24" x2="38" y2="24" stroke="#F5D451" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16" y1="31" x2="38" y2="31" stroke="#F5D451" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16" y1="38" x2="30" y2="38" stroke="#F5D451" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="46" cy="46" r="13" fill="#A8DCC6"/>
       <path d="M40 46 L45 51 L53 41" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     </svg>
     <h2>파일을 여기로 끌어다 놓아주세요</h2>
@@ -1193,7 +1199,7 @@ function esc(s) {
 function normalizeText(s) {
   return (s || "")
     .replace(/[​‌‍﻿]/g, "")
-    .replace(/[ 　]/g, " ")
+    .replace(/[ 　]/g, " ")
     .replace(/[·․‧]/g, ".")
     .replace(/[－–—]/g, "-")
     .replace(/／/g, "/")
