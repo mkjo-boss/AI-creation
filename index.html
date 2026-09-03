@@ -1,0 +1,306 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>세무 업무 도구함</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#4A3542;
+    --ink-soft:#8B7280;
+    --panel:#FFFFFF;
+    --line:#F6E1EA;
+    --pink:#F0A9C4;
+    --pink-deep:#D6739A;
+    --pink-wash:#FDEDF4;
+    --rose:#F2B7CB;
+    --gold:#C98A6B;
+    --gold-soft:#F0CFC2;
+    --shadow:0 8px 24px rgba(214,115,154,0.13);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    color:var(--ink);
+    font-family:"Fredoka","Gowun Dodum","맑은 고딕","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    font-weight:400;
+    line-height:1.75;
+    letter-spacing:0.1px;
+    -webkit-text-stroke-width:0.2px;
+    background:
+      radial-gradient(1100px 520px at 12% -8%, #FFE9F1 0%, rgba(255,233,241,0) 62%),
+      radial-gradient(900px 460px at 88% 0%, #FDDFEA 0%, rgba(253,223,234,0) 64%),
+      linear-gradient(170deg,#FFF8FB 0%, #FDF2F7 50%, #FFF6F9 100%);
+    background-attachment:fixed;
+  }
+
+  /* 배경에 둥실둥실 떠 있는 하트 */
+  .hearts{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;}
+  .hearts svg{position:absolute;animation-name:bob;animation-timing-function:ease-in-out;animation-iteration-count:infinite;}
+  @keyframes bob{
+    0%   {transform:translateY(6px)   rotate(-8deg) scale(.94); opacity:.35;}
+    50%  {transform:translateY(-14px) rotate(7deg)  scale(1.06); opacity:.8;}
+    100% {transform:translateY(6px)   rotate(-8deg) scale(.94); opacity:.35;}
+  }
+  .hearts svg:nth-child(1){top:13%;left:7%;  width:26px;animation-duration:6.2s;animation-delay:0s;}
+  .hearts svg:nth-child(2){top:23%;left:90%; width:17px;animation-duration:7.4s;animation-delay:.7s;}
+  .hearts svg:nth-child(3){top:58%;left:4%;  width:20px;animation-duration:5.6s;animation-delay:1.5s;}
+  .hearts svg:nth-child(4){top:74%;left:88%; width:28px;animation-duration:8.1s;animation-delay:.3s;}
+  .hearts svg:nth-child(5){top:41%;left:80%; width:14px;animation-duration:6.8s;animation-delay:2.2s;}
+  .hearts svg:nth-child(6){top:85%;left:30%; width:16px;animation-duration:7.7s;animation-delay:1.1s;}
+  .hearts svg:nth-child(7){top:8%; left:64%; width:13px;animation-duration:6.0s;animation-delay:2.8s;}
+  .hearts svg:nth-child(8){top:66%;left:66%; width:12px;animation-duration:8.6s;animation-delay:1.9s;}
+  .hearts svg:nth-child(9){top:36%;left:15%; width:15px;animation-duration:7.1s;animation-delay:3.3s;}
+  @media (prefers-reduced-motion:reduce){
+    .hearts svg{animation:none;opacity:.4;}
+  }
+
+  .wrap{
+    position:relative;
+    z-index:1;
+    max-width:620px;
+    margin:0 auto;
+    padding:52px 24px 64px;
+  }
+
+  header{text-align:center;margin-bottom:28px;}
+  .mascot{
+    width:104px;
+    height:auto;
+    margin:0 auto 10px;
+    display:block;
+    object-fit:contain;
+  }
+  /* 흰 배경이 있는 그림을 분홍 배경에 자연스럽게 얹을 때 */
+  .mascot.blend{mix-blend-mode:multiply;}
+  h1{
+    font-size:25px;
+    font-weight:500;
+    margin:0;
+    letter-spacing:0.4px;
+  }
+  .rule{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    margin:16px auto 0;
+    max-width:240px;
+  }
+  .rule i{
+    height:1px;
+    flex:1;
+    background:linear-gradient(90deg,rgba(201,138,107,0) 0%,var(--gold-soft) 50%,rgba(201,138,107,0) 100%);
+  }
+  .rule b{display:flex;gap:5px;}
+  .rule b span{width:5px;height:5px;border-radius:50%;background:var(--gold-soft);}
+  .rule b span:nth-child(2){background:var(--rose);width:6px;height:6px;}
+
+  /* 도구 : 정사각 타일 */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(146px,1fr));
+    gap:12px;
+  }
+  .card{
+    position:relative;
+    aspect-ratio:1 / 1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:11px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    box-shadow:var(--shadow);
+    padding:14px 12px;
+    text-decoration:none;
+    color:inherit;
+    overflow:hidden;
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:0;left:0;right:0;
+    height:4px;
+    background:var(--accent,var(--pink));
+  }
+  a.card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 14px 28px rgba(214,115,154,0.2);
+    border-color:var(--accent,var(--pink));
+  }
+  a.card:focus-visible{outline:3px solid var(--accent,var(--pink));outline-offset:3px;}
+
+  .card-icon{
+    flex:none;
+    width:52px;height:52px;
+    border-radius:15px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent-wash,var(--pink-wash));
+  }
+  .card-icon svg{width:28px;height:28px;}
+  .card h2{
+    width:100%;
+    font-size:13.5px;
+    font-weight:500;
+    margin:0;
+    text-align:center;
+    line-height:1.45;
+    word-break:keep-all;
+  }
+  .go{
+    position:absolute;
+    right:10px;
+    bottom:10px;
+    width:24px;height:24px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent-deep,var(--pink-deep));
+    color:#fff;
+    font-size:11px;
+    opacity:.85;
+  }
+  a.card:hover .go{opacity:1;background:var(--ink);}
+
+  /* 노랑 계열 도구 (파일명 변환기) */
+  .card.tone-yellow{
+    --accent:#F5D451;
+    --accent-wash:#FFF6D9;
+    --accent-deep:#8D6C15;
+  }
+
+  .card.soon{
+    background:rgba(255,255,255,0.55);
+    border-style:dashed;
+    border-color:#F0DCE4;
+    box-shadow:none;
+  }
+  .card.soon::before{opacity:.3;}
+  .card.soon .card-icon{background:#FAF0F4;}
+  .card.soon h2{color:var(--ink-soft);}
+  .soon-badge{
+    position:absolute;
+    right:9px;
+    bottom:9px;
+    font-size:10.5px;
+    color:var(--gold);
+    border:1px solid var(--gold-soft);
+    border-radius:999px;
+    padding:2px 9px;
+    background:rgba(255,255,255,0.75);
+  }
+
+  @media (max-width:640px){
+    .wrap{padding:40px 18px 52px;}
+    h1{font-size:22px;}
+    .mascot{width:88px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="hearts" aria-hidden="true">
+  <svg viewBox="0 0 24 24" fill="#F7BFD3"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#F5A9C6"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#FBD0DC"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#F7BFD3"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#F5A9C6"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#FBD0DC"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#F7BFD3"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#F5A9C6"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+  <svg viewBox="0 0 24 24" fill="#FBD0DC"><path d="M12 21.6C6.7 17.2 3 14 3 10.2 3 7.3 5.3 5 8.2 5c1.7 0 3.3.8 4.3 2.1C13.5 5.8 15.1 5 16.8 5 19.7 5 22 7.3 22 10.2c0 3.8-3.7 7-10 11.4z"/></svg>
+</div>
+
+<div class="wrap">
+
+  <header>
+    <!--
+      이 폴더에 mascot.png 를 저장해두면 그 그림이 자동으로 표시됩니다.
+      (mascot.png → 없으면 mascot.jpg → 없으면 mascot.webp → 그래도 없으면 아래 고양이 그림)
+      흰 배경이 있는 그림이면 아래 <img> 의 class 에 blend 를 추가하세요 : class="mascot blend"
+    -->
+    <img class="mascot" id="mascotImg" src="mascot.png" alt=""
+         onerror="var s=this.dataset.step||'0';
+                  if(s==='0'){this.dataset.step='1';this.src='mascot.jpg';}
+                  else if(s==='1'){this.dataset.step='2';this.src='mascot.webp';}
+                  else{this.style.display='none';document.getElementById('mascotDraw').style.display='block';}">
+
+    <!-- 준비된 그림이 없을 때 대신 보여줄 고양이 -->
+    <svg class="mascot" id="mascotDraw" style="display:none" viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <!-- 귀 -->
+      <path d="M32 46 L24 12 L58 30 Z" fill="#FFFCF7" stroke="#E8A0B8" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M108 46 L116 12 L82 30 Z" fill="#FFFCF7" stroke="#E8A0B8" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M34 41 L30 21 L49 31 Z" fill="#FBD3DF"/>
+      <path d="M106 41 L110 21 L91 31 Z" fill="#FBD3DF"/>
+      <!-- 얼굴 -->
+      <ellipse cx="70" cy="66" rx="46" ry="40" fill="#FFFCF7" stroke="#E8A0B8" stroke-width="3"/>
+      <!-- 볼 -->
+      <ellipse cx="40" cy="78" rx="8.5" ry="5.5" fill="#FBC4D3" opacity="0.85"/>
+      <ellipse cx="100" cy="78" rx="8.5" ry="5.5" fill="#FBC4D3" opacity="0.85"/>
+      <!-- 눈 (웃는 눈) -->
+      <path d="M44 66 q8 -9 16 0" stroke="#6B5260" stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M80 66 q8 -9 16 0" stroke="#6B5260" stroke-width="3.6" stroke-linecap="round"/>
+      <!-- 코 · 입 -->
+      <ellipse cx="70" cy="76" rx="5" ry="3.6" fill="#F2A0A8"/>
+      <path d="M60 84 q10 8 20 0" stroke="#6B5260" stroke-width="3.2" stroke-linecap="round"/>
+      <!-- 수염 -->
+      <path d="M13 62 L33 67 M11 73 L33 74 M13 84 L33 80" stroke="#E8A0B8" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M127 62 L107 67 M129 73 L107 74 M127 84 L107 80" stroke="#E8A0B8" stroke-width="2.6" stroke-linecap="round"/>
+      <!-- 리본 -->
+      <path d="M104 26 c-10 -9 -21 -6 -21 4 c0 9 11 11 21 3 z" fill="#F0A9C4" stroke="#D6739A" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M104 26 c10 -9 21 -6 21 4 c0 9 -11 11 -21 3 z" fill="#F0A9C4" stroke="#D6739A" stroke-width="2.4" stroke-linejoin="round"/>
+      <circle cx="104" cy="29" r="5.4" fill="#E58FB2" stroke="#D6739A" stroke-width="2.2"/>
+    </svg>
+
+    <h1>세무 업무 도구함</h1>
+
+    <div class="rule">
+      <i></i>
+      <b><span></span><span></span><span></span></b>
+      <i></i>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <a class="card tone-yellow" href="파일명_자동변환기_10.html">
+      <div class="card-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="12" width="34" height="42" rx="5" fill="#FFFFFF" stroke="#8D6C15" stroke-width="3.2"/>
+          <line x1="18" y1="24" x2="36" y2="24" stroke="#F5D451" stroke-width="3.2" stroke-linecap="round"/>
+          <line x1="18" y1="32" x2="36" y2="32" stroke="#F5D451" stroke-width="3.2" stroke-linecap="round"/>
+          <line x1="18" y1="40" x2="29" y2="40" stroke="#F5D451" stroke-width="3.2" stroke-linecap="round"/>
+          <circle cx="46" cy="45" r="14" fill="#A8DCC6"/>
+          <path d="M39 45 L44 50 L53 39" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2>파일명 자동 변환기</h2>
+      <span class="go">→</span>
+    </a>
+
+    <div class="card soon">
+      <div class="card-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="20" stroke="#DDBFCC" stroke-width="3.4" stroke-dasharray="5 6"/>
+          <line x1="32" y1="23" x2="32" y2="41" stroke="#DDBFCC" stroke-width="3.4" stroke-linecap="round"/>
+          <line x1="23" y1="32" x2="41" y2="32" stroke="#DDBFCC" stroke-width="3.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2>다음 도구 자리</h2>
+      <span class="soon-badge">준비 중</span>
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>
