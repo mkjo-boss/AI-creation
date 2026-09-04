@@ -1681,8 +1681,39 @@ function detectDocTypes(lines, fileBase) {
     }
   });
 
+  /* 사전에도 없고 꼬리말 규칙에도 안 걸리는 문서라면,
+     '제목으로 판단한 줄'을 다듬어서 그대로 문서종류로 쓴다.
+     제목이라고 판단해 놓고 문서종류를 비워두면 안 되니까. */
+  const titleCands = lines.filter(function (l) {
+    return l.titleWeight >= 70 && !isTableHeaderLine(l.t) && !isArticleLine(l.t);
+  }).sort(function (a, b) { return b.titleWeight - a.titleWeight; });
+  // 가장 확실한 제목 한 줄만 본다. 그게 문서종류로 쓸 만하지 않으면 차라리 비워둔다
+  if (titleCands.length) {
+    const best = titleCands[0];
+    const v = titleAsDocType(best.t);
+    if (v) add(v, 30 + v.length, '제목 줄을 그대로 사용 · "' + best.t.slice(0, 24) + '"');
+  }
+
   return Object.keys(found).map(function (k) { return found[k]; })
     .sort(function (a, b) { return b.score - a.score; });
+}
+
+/* 제목 줄에서 문서종류로 쓸 만한 말만 남긴다.
+   '2025년 3월 급여대장(확정)' → '급여대장' */
+function titleAsDocType(raw) {
+  let t = normalizeText(raw || "");
+  t = t.replace(/\([^)]*\)/g, " ").replace(/\[[^\]]*\]/g, " ");   // 괄호 안 제거
+  t = t.replace(/(19|20)\d{2}\s*[년.\-/]?/g, " ");                 // 연도
+  t = t.replace(/\d{1,2}\s*[월분]\s*/g, " ");                      // 월·분
+  t = t.replace(/\d{1,2}\s*일/g, " ");                             // 일
+  t = t.replace(/제\s*\d+\s*[호기차]/g, " ");                      // 제1호·제2기
+  t = t.replace(/[^가-힣A-Za-z0-9\s]/g, " ");                       // 기호
+  t = t.replace(/\s{2,}/g, " ").trim();
+  t = t.replace(/\s/g, "");                                        // 파일명 형식에 맞춰 붙임
+  if (t.length < 2 || t.length > 22) return null;
+  if (/^\d+$/.test(t)) return null;
+  if (DOC_TYPES.some(function (d) { return d.n === t; })) return null;   // 이미 사전에 있는 건 제외
+  return t;
 }
 
 // 한국 문서 이름이 흔히 끝나는 말들
